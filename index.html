@@ -550,14 +550,17 @@ function App(){
   const iniciarViagem = async (dados) => {
     const resp = await apiPost('iniciarViagem', {
       motorista:user.nome, veiculoId:dados.veiculoId, finalidade:dados.finalidade,
-      kmInicial:Number(dados.kmInicial), fotoInicialBase64:dados.fotoInicial
+      kmInicial:Number(dados.kmInicial), fotoInicialBase64:dados.fotoInicial,
+      combustivelInicial:dados.combustivel, avariasInicial:dados.avarias, obsInicial:dados.obs
     });
     setViagens(prev=>[resp, ...prev]);
   };
 
-  const finalizarViagemChamada = async (viagemId, kmFinal, fotoFinalBase64) => {
-    const resp = await apiPost('finalizarViagem', {viagemId, kmFinal:Number(kmFinal), fotoFinalBase64});
-    setViagens(prev=>prev.map(v=> v.id===viagemId ? {...v, kmFinal:Number(kmFinal), fotoFinalUrl:resp.fotoFinalUrl, fim:resp.fim, status:'concluida'} : v));
+  const finalizarViagemChamada = async (viagemId, kmFinal, fotoFinalBase64, vistoriaFinal) => {
+    const resp = await apiPost('finalizarViagem', {viagemId, kmFinal:Number(kmFinal), fotoFinalBase64,
+      combustivelFinal: vistoriaFinal.combustivel, avariasFinal: vistoriaFinal.avarias, obsFinal: vistoriaFinal.obs});
+    setViagens(prev=>prev.map(v=> v.id===viagemId ? {...v, kmFinal:Number(kmFinal), fotoFinalUrl:resp.fotoFinalUrl, fim:resp.fim, status:'concluida',
+      combustivelFinal:vistoriaFinal.combustivel, avariasFinal:(vistoriaFinal.avarias||[]).join(', '), obsFinal:vistoriaFinal.obs} : v));
   };
 
   const criarVeiculoChamada = async (dados) => {
@@ -575,6 +578,7 @@ function App(){
   ];
   const NAV_ADMIN = [
     {id:"painel", label:"Painel", icon:IconGrid},
+    {id:"mapa-vivo", label:"Mapa ao Vivo", icon:IconPin},
     {id:"veiculos", label:"Veículos", icon:IconTruck},
     {id:"viagens", label:"Viagens", icon:IconMap},
     {id:"relatorios", label:"Relatórios", icon:IconBar},
@@ -635,6 +639,7 @@ function App(){
                 <MinhasViagens viagens={minhasViagens} veiculos={veiculos} onAbrir={setDetalheViagem}/>
               )}
               {user.tipo==="admin" && page==="painel" && <PainelAdmin viagens={viagens} veiculos={veiculos}/>}
+              {user.tipo==="admin" && page==="mapa-vivo" && <MapaVivo viagens={viagens} veiculos={veiculos}/>}
               {user.tipo==="admin" && page==="veiculos" && <VeiculosAdmin veiculos={veiculos} veiculoDisponivel={veiculoDisponivel} onCriar={criarVeiculoChamada} onRemover={removerVeiculoChamada}/>}
               {user.tipo==="admin" && page==="viagens" && <ViagensAdmin viagens={viagens} veiculos={veiculos} onAbrir={setDetalheViagem}/>}
               {user.tipo==="admin" && page==="relatorios" && <RelatoriosAdmin viagens={viagens} veiculos={veiculos}/>}
@@ -648,12 +653,47 @@ function App(){
   );
 }
 
+/* ---------- checklist de vistoria (combustível + avarias + observações) ---------- */
+const AVARIA_OPCOES = ["Pneus","Lataria/Pintura","Para-brisa/Vidros","Bancos/Estofado","Outro"];
+function VistoriaChecklist({combustivel, setCombustivel, avarias, setAvarias, obs, setObs, titulo}){
+  const toggleAvaria = (op) => setAvarias(prev => prev.includes(op) ? prev.filter(a=>a!==op) : [...prev, op]);
+  return (
+    <div className="section-block ok">
+      <h3><IconClip size={15}/> {titulo || "Vistoria do veículo"}</h3>
+      <div className="field">
+        <label>Nível de combustível<span style={{color:'var(--vermelho)'}}> *</span></label>
+        <select value={combustivel} onChange={e=>setCombustivel(e.target.value)}>
+          <option value="">Selecione</option>
+          <option>Reserva</option><option>1/4</option><option>1/2</option><option>3/4</option><option>Cheio</option>
+        </select>
+      </div>
+      <div className="field">
+        <label>Avarias observadas (opcional)</label>
+        <div className="flexwrap">
+          {AVARIA_OPCOES.map(op=>(
+            <label key={op} style={{display:'flex',alignItems:'center',gap:6,fontSize:12.5,fontWeight:500,color:'var(--texto)',background:'#fff',border:'1px solid var(--borda)',borderRadius:8,padding:'7px 10px',cursor:'pointer'}}>
+              <input type="checkbox" checked={avarias.includes(op)} onChange={()=>toggleAvaria(op)} style={{width:'auto'}}/> {op}
+            </label>
+          ))}
+        </div>
+      </div>
+      <div className="field" style={{marginBottom:0}}>
+        <label>Observações (opcional)</label>
+        <textarea rows={2} placeholder="Ex: risco na porta traseira esquerda" value={obs} onChange={e=>setObs(e.target.value)}></textarea>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Motorista: nova viagem ---------- */
 function NovaViagem({user, veiculos, veiculoDisponivel, onIniciar}){
   const [veiculoId,setVeiculoId]=useState("");
   const [finalidade,setFinalidade]=useState("");
   const [kmInicial,setKmInicial]=useState("");
   const [fotoInicial,setFotoInicial]=useState(null);
+  const [combustivel,setCombustivel]=useState("");
+  const [avarias,setAvarias]=useState([]);
+  const [obs,setObs]=useState("");
   const [erro,setErro]=useState("");
   const [salvando,setSalvando]=useState(false);
 
@@ -664,8 +704,9 @@ function NovaViagem({user, veiculos, veiculoDisponivel, onIniciar}){
     if(!veiculoId) return setErro("Selecione o veículo.");
     if(kmInicial==="" || Number(kmInicial)<0) return setErro("Informe a quilometragem inicial.");
     if(!fotoInicial) return setErro("A foto do painel de KM é obrigatória.");
+    if(!combustivel) return setErro("Selecione o nível de combustível na vistoria.");
     setErro(""); setSalvando(true);
-    try{ await onIniciar({veiculoId, kmInicial, finalidade, fotoInicial}); }
+    try{ await onIniciar({veiculoId, kmInicial, finalidade, fotoInicial, combustivel, avarias, obs}); }
     catch(err){ setErro("Não foi possível iniciar a viagem: "+(err.message||err)); }
     setSalvando(false);
   };
@@ -723,6 +764,8 @@ function NovaViagem({user, veiculos, veiculoDisponivel, onIniciar}){
           )}
         </div>
 
+        <VistoriaChecklist combustivel={combustivel} setCombustivel={setCombustivel} avarias={avarias} setAvarias={setAvarias} obs={obs} setObs={setObs} titulo="Vistoria de saída"/>
+
         {erro && <div className="banner-error" style={{marginBottom:14}}><IconAlert size={15}/><span>{erro}</span></div>}
 
         <div className="banner-warn" style={{marginBottom:16}}>
@@ -743,23 +786,40 @@ function NovaViagem({user, veiculos, veiculoDisponivel, onIniciar}){
 /* ---------- Motorista: viagem em andamento ---------- */
 function ViagemAndamento({viagem, veiculos, onFinalizar}){
   const veiculo = veiculos.find(v=>v.id===viagem.veiculoId);
+  const STORAGE_KEY = 'rotafrota_pendentes_' + viagem.id;
   const [agora,setAgora]=useState(Date.now());
   const [statusGps,setStatusGps]=useState("aguardando");
   const [pontos,setPontos]=useState([]);
+  const [online,setOnline]=useState(navigator.onLine);
   const [kmFinal,setKmFinal]=useState("");
   const [fotoFinal,setFotoFinal]=useState(null);
+  const [combustivelFinal,setCombustivelFinal]=useState("");
+  const [avariasFinal,setAvariasFinal]=useState([]);
+  const [obsFinal,setObsFinal]=useState("");
   const [mostrarFinalizar,setMostrarFinalizar]=useState(false);
   const [erro,setErro]=useState("");
   const [salvando,setSalvando]=useState(false);
   const watchIdRef = useRef(null);
   const bufferRef = useRef([]);
+  const flushRef = useRef(async ()=>{});
 
   useEffect(()=>{ const t=setInterval(()=>setAgora(Date.now()),1000); return ()=>clearInterval(t); },[]);
+
+  // modo offline: recupera pontos que ficaram pendentes de um fechamento/queda anterior desta mesma viagem
+  useEffect(()=>{
+    try{
+      const salvo = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      if(salvo.length){ bufferRef.current = bufferRef.current.concat(salvo); setPontos(prev=>prev.concat(salvo)); }
+    }catch(e){}
+  },[]);
+
+  const persistBuffer = () => { try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(bufferRef.current)); }catch(e){} };
 
   const registrarPonto = (pos, origem) => {
     const ponto = {lat:pos.coords.latitude, lng:pos.coords.longitude, t:Date.now(), acc:pos.coords.accuracy, origem};
     setPontos(prev=>[...prev, ponto]);
     bufferRef.current.push(ponto);
+    persistBuffer();
   };
 
   useEffect(()=>{
@@ -778,17 +838,27 @@ function ViagemAndamento({viagem, veiculos, onFinalizar}){
     return ()=>{ if(watchIdRef.current!==null) navigator.geolocation.clearWatch(watchIdRef.current); document.removeEventListener("visibilitychange", onVisible); };
   },[viagem.id]);
 
-  // envia os pontos acumulados para a planilha a cada 15s, em lote
+  // envia os pontos acumulados para a planilha a cada 15s, em lote — se falhar (sem internet), mantém salvo localmente e tenta de novo depois
   useEffect(()=>{
-    const flush = async () => {
+    flushRef.current = async () => {
       if(bufferRef.current.length===0) return;
       const lote = bufferRef.current; bufferRef.current=[];
-      try{ await apiPost('adicionarPontos', {viagemId:viagem.id, pontos:lote}); }
-      catch(err){ bufferRef.current = lote.concat(bufferRef.current); }
+      try{ await apiPost('adicionarPontos', {viagemId:viagem.id, pontos:lote}); try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} }
+      catch(err){ bufferRef.current = lote.concat(bufferRef.current); persistBuffer(); }
     };
-    const t = setInterval(flush, 15000);
-    return ()=>{ clearInterval(t); flush(); };
+  });
+
+  useEffect(()=>{
+    const t = setInterval(()=>flushRef.current(), 15000);
+    return ()=>{ clearInterval(t); flushRef.current(); };
   },[viagem.id]);
+
+  useEffect(()=>{
+    const goOnline=()=>{ setOnline(true); flushRef.current(); };
+    const goOffline=()=>setOnline(false);
+    window.addEventListener('online',goOnline); window.addEventListener('offline',goOffline);
+    return ()=>{ window.removeEventListener('online',goOnline); window.removeEventListener('offline',goOffline); };
+  },[]);
 
   const checkpointManual = () => {
     if(!navigator.geolocation) return;
@@ -801,11 +871,12 @@ function ViagemAndamento({viagem, veiculos, onFinalizar}){
   const confirmarFinal = async () => {
     if(kmFinal==="" || Number(kmFinal) < Number(viagem.kmInicial)) return setErro("A quilometragem final deve ser maior ou igual à inicial ("+viagem.kmInicial+").");
     if(!fotoFinal) return setErro("A foto do painel de KM final é obrigatória.");
+    if(!combustivelFinal) return setErro("Selecione o nível de combustível na vistoria.");
     setErro(""); setSalvando(true);
     try{
       if(watchIdRef.current!==null) navigator.geolocation.clearWatch(watchIdRef.current);
-      if(bufferRef.current.length){ await apiPost('adicionarPontos', {viagemId:viagem.id, pontos:bufferRef.current}); bufferRef.current=[]; }
-      await onFinalizar(viagem.id, kmFinal, fotoFinal);
+      if(bufferRef.current.length){ await apiPost('adicionarPontos', {viagemId:viagem.id, pontos:bufferRef.current}); bufferRef.current=[]; try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} }
+      await onFinalizar(viagem.id, kmFinal, fotoFinal, {combustivel:combustivelFinal, avarias:avariasFinal, obs:obsFinal});
     }catch(err){ setErro("Não foi possível salvar: "+(err.message||err)); }
     setSalvando(false);
   };
@@ -816,6 +887,13 @@ function ViagemAndamento({viagem, veiculos, onFinalizar}){
         <div className="badge" style={{background:'var(--verde)'}}><IconMap size={18} color="#fff"/></div>
         <div><h1>Viagem em andamento</h1><p>{veiculo?.placa} · {veiculo?.modelo}</p></div>
       </div>
+
+      {!online && (
+        <div className="banner-warn" style={{marginBottom:14}}>
+          <IconAlert size={15}/>
+          <span>Sem conexão com a internet agora. Os pontos de GPS continuam sendo salvos neste celular e serão enviados automaticamente para a planilha assim que a conexão voltar.</span>
+        </div>
+      )}
 
       <div className="grid grid-3" style={{marginBottom:14}}>
         <div className="stat" style={{'--accent':'var(--verde)'}}>
@@ -847,7 +925,7 @@ function ViagemAndamento({viagem, veiculos, onFinalizar}){
         <div style={{marginTop:12}}>
           <button className="btn btn-ghost" onClick={checkpointManual}><IconPin size={15}/> Registrar minha localização agora</button>
         </div>
-        <p style={{fontSize:11.5,color:'var(--texto-suave)',marginTop:10,marginBottom:0}}>O rastreamento roda enquanto este app estiver na tela, e os pontos são enviados à planilha a cada 15 segundos. Se a tela travar ou trocar de app, o registro pausa e retoma sozinho ao voltar aqui.</p>
+        <p style={{fontSize:11.5,color:'var(--texto-suave)',marginTop:10,marginBottom:0}}>O rastreamento roda enquanto este app estiver na tela, e os pontos são enviados à planilha a cada 15 segundos. Se a tela travar, trocar de app ou faltar internet, o registro continua salvo neste celular e é enviado assim que possível.</p>
       </div>
 
       {erro && <div className="banner-error" style={{marginBottom:14}}><IconAlert size={15}/><span>{erro}</span></div>}
@@ -859,13 +937,14 @@ function ViagemAndamento({viagem, veiculos, onFinalizar}){
       ) : (
         <div className="card">
           <h3 style={{marginTop:0,fontSize:14}}>Encerrar viagem</h3>
-          <div className="section-block ok" style={{marginBottom:12}}>
+          <div className="section-block accent" style={{marginBottom:12}}>
             <div className="field">
               <label>KM do painel ao chegar</label>
               <input type="number" inputMode="numeric" placeholder={"Maior ou igual a "+viagem.kmInicial} value={kmFinal} onChange={e=>setKmFinal(e.target.value)}/>
             </div>
             {kmFinal!=="" && <CameraCapture label="Foto do painel de KM (final)" value={fotoFinal} onChange={setFotoFinal} required/>}
           </div>
+          <VistoriaChecklist combustivel={combustivelFinal} setCombustivel={setCombustivelFinal} avarias={avariasFinal} setAvarias={setAvariasFinal} obs={obsFinal} setObs={setObsFinal} titulo="Vistoria de chegada"/>
           <div className="sticky-actions" style={{padding:'8px 0 0'}}>
             <div className="flexwrap">
               <button className="btn btn-accent" style={{flex:1}} disabled={salvando} onClick={confirmarFinal}>
@@ -1067,6 +1146,15 @@ function RelatoriosAdmin({viagens, veiculos}){
   });
   const maxKm = Math.max(1, ...porVeiculo.map(p=>p.km));
 
+  const motoristasMap = {};
+  concluidas.forEach(v=>{
+    if(!motoristasMap[v.motorista]) motoristasMap[v.motorista] = {motorista:v.motorista, km:0, viagens:0};
+    motoristasMap[v.motorista].km += (v.kmFinal - v.kmInicial);
+    motoristasMap[v.motorista].viagens += 1;
+  });
+  const porMotorista = Object.values(motoristasMap).sort((a,b)=>b.km-a.km);
+  const maxKmMotorista = Math.max(1, ...porMotorista.map(p=>p.km));
+
   const exportarCSV = () => {
     const header = "Motorista,Placa,Inicio,Fim,KM Inicial,KM Final,KM Rodado\n";
     const rows = concluidas.map(v=>{
@@ -1081,7 +1169,7 @@ function RelatoriosAdmin({viagens, veiculos}){
 
   return (
     <div>
-      <div className="page-head"><div className="badge"><IconBar size={18} color="#fff"/></div><div><h1>Relatórios</h1><p>Quilometragem rodada por veículo</p></div></div>
+      <div className="page-head"><div className="badge"><IconBar size={18} color="#fff"/></div><div><h1>Relatórios</h1><p>Quilometragem rodada por veículo e por motorista</p></div></div>
       <div className="card" style={{marginBottom:16}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:10}}>
           <h3 style={{margin:0,fontSize:14}}>Km rodado por veículo</h3>
@@ -1098,10 +1186,138 @@ function RelatoriosAdmin({viagens, veiculos}){
           </div>
         ))}
       </div>
+
+      <div className="card" style={{marginBottom:16}}>
+        <h3 style={{marginTop:0,marginBottom:16,fontSize:14}}>Ranking por motorista</h3>
+        {porMotorista.length===0 ? <p style={{color:'var(--texto-suave)',fontSize:13.5,margin:0}}>Nenhuma viagem concluída ainda.</p> : (
+        <div className="tablewrap">
+          <table style={{marginBottom:16}}>
+            <thead><tr><th>Motorista</th><th>Viagens</th><th>Km rodado</th></tr></thead>
+            <tbody>
+              {porMotorista.map(p=>(
+                <tr key={p.motorista}><td>{p.motorista}</td><td className="mono">{p.viagens}</td><td className="mono">{p.km} km</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        )}
+        {porMotorista.map(p=>(
+          <div key={p.motorista} style={{marginBottom:12}}>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}>
+              <span>{p.motorista}</span><span className="mono">{p.km} km</span>
+            </div>
+            <div style={{height:10,background:'#eef1f3',borderRadius:6,overflow:'hidden'}}>
+              <div style={{height:'100%',width:(p.km/maxKmMotorista*100)+'%',background:'linear-gradient(90deg,var(--verde),var(--linha))'}}></div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <div className="odo">
         <div className="odo-label">Total geral rodado</div>
         <div className="digits">{String(concluidas.reduce((s,v)=>s+(v.kmFinal-v.kmInicial),0)).padStart(6,'0')} KM</div>
       </div>
+    </div>
+  );
+}
+
+/* ---------- Admin: mapa ao vivo (todos os veículos em uso agora) ---------- */
+function LiveFleetMap({items, height=420}){
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  const layersRef = useRef({});
+
+  useEffect(()=>{
+    if(!containerRef.current || mapRef.current) return;
+    const map = L.map(containerRef.current, {attributionControl:true, zoomControl:true});
+    map.setView([-20.3297, -40.2925], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; colaboradores do OpenStreetMap'
+    }).addTo(map);
+    mapRef.current = map;
+    return () => { map.remove(); mapRef.current = null; };
+  }, []);
+
+  useEffect(()=>{
+    const map = mapRef.current;
+    if(!map) return;
+    const idsAtivos = new Set(items.map(i=>i.viagem.id));
+    Object.keys(layersRef.current).forEach(id=>{
+      if(!idsAtivos.has(id)){
+        map.removeLayer(layersRef.current[id].marker);
+        if(layersRef.current[id].line) map.removeLayer(layersRef.current[id].line);
+        delete layersRef.current[id];
+      }
+    });
+
+    const todosPontos = [];
+    items.forEach(({viagem, veiculo, pontos})=>{
+      if(!pontos || pontos.length===0) return;
+      const latlngs = pontos.map(p=>[p.lat,p.lng]);
+      todosPontos.push(...latlngs);
+      const last = latlngs[latlngs.length-1];
+      const cor = TIPO_COR[veiculo && veiculo.tipo] || '#2f6690';
+      let entry = layersRef.current[viagem.id];
+      if(!entry){
+        const marker = L.circleMarker(last, {radius:8, weight:2, color:'#fff', fillColor:cor, fillOpacity:1}).addTo(map);
+        marker.bindPopup("<b>"+(veiculo?veiculo.placa:"")+"</b><br/>"+viagem.motorista+"<br/>"+(veiculo?veiculo.modelo:""));
+        const line = L.polyline(latlngs, {color:cor, weight:3, opacity:0.45}).addTo(map);
+        layersRef.current[viagem.id] = {marker, line};
+      } else {
+        entry.marker.setLatLng(last);
+        entry.line.setLatLngs(latlngs);
+      }
+    });
+    if(todosPontos.length){
+      map.fitBounds(L.latLngBounds(todosPontos), {padding:[40,40], maxZoom:15});
+    }
+  }, [items]);
+
+  return <div className="route-map-wrap"><div ref={containerRef} style={{height}}></div></div>;
+}
+
+function MapaVivo({viagens, veiculos}){
+  const ativos = viagens.filter(v=>v.status==="em_andamento");
+  const idsAtivos = ativos.map(v=>v.id).join(',');
+  const [dados,setDados] = useState({});
+
+  useEffect(()=>{
+    let cancelado=false;
+    const atualizar = async () => {
+      const resultado = {};
+      await Promise.all(ativos.map(async (v)=>{
+        try{ resultado[v.id] = await apiGet('pontos', {viagemId:v.id}); }
+        catch(e){ resultado[v.id] = []; }
+      }));
+      if(!cancelado) setDados(resultado);
+    };
+    atualizar();
+    const t = setInterval(atualizar, 20000);
+    return ()=>{ cancelado=true; clearInterval(t); };
+  }, [idsAtivos]);
+
+  const items = ativos.map(v=>({viagem:v, veiculo:veiculos.find(x=>x.id===v.veiculoId), pontos:dados[v.id]||[]}));
+
+  return (
+    <div>
+      <div className="page-head"><div className="badge"><IconPin size={18} color="#fff"/></div><div><h1>Mapa ao vivo</h1><p>Veículos em uso agora — atualiza a cada 20 segundos</p></div></div>
+      {ativos.length===0 ? (
+        <div className="card"><p style={{color:'var(--texto-suave)',fontSize:13.5,margin:0}}>Nenhum veículo em uso no momento.</p></div>
+      ) : (
+        <React.Fragment>
+          <div className="card" style={{marginBottom:14,padding:8}}>
+            <LiveFleetMap items={items}/>
+          </div>
+          <div className="grid grid-3">
+            {items.map(({viagem,veiculo})=>(
+              <div key={viagem.id} className="stat" style={{'--accent': TIPO_COR[veiculo && veiculo.tipo] || 'var(--azul-estrada)'}}>
+                <div className="label">{veiculo?veiculo.placa:'—'}</div>
+                <div className="value" style={{fontSize:15}}>{viagem.motorista}</div>
+              </div>
+            ))}
+          </div>
+        </React.Fragment>
+      )}
     </div>
   );
 }
@@ -1145,6 +1361,22 @@ function DetalheModal({viagem, veiculos, onClose}){
             <div>
               <label>Foto KM final</label>
               {viagem.fotoFinalUrl ? <a href={viagem.fotoFinalUrl} target="_blank" rel="noreferrer"><img src={viagem.fotoFinalUrl} style={{borderRadius:10,border:'1px solid var(--borda)'}}/></a> : <p style={{fontSize:12,color:'var(--texto-suave)'}}>—</p>}
+            </div>
+          </div>
+        )}
+        {(viagem.combustivelInicial || viagem.combustivelFinal || viagem.avariasInicial || viagem.avariasFinal) && (
+          <div className="grid" style={{gridTemplateColumns:'1fr 1fr',marginTop:16}}>
+            <div className="section-block" style={{marginBottom:0}}>
+              <h3 style={{fontSize:12.5}}>Vistoria de saída</h3>
+              <p style={{fontSize:12.5,margin:'0 0 4px'}}><b>Combustível:</b> {viagem.combustivelInicial || "—"}</p>
+              <p style={{fontSize:12.5,margin:'0 0 4px'}}><b>Avarias:</b> {viagem.avariasInicial || "Nenhuma"}</p>
+              {viagem.obsInicial && <p style={{fontSize:12.5,margin:0}}><b>Obs.:</b> {viagem.obsInicial}</p>}
+            </div>
+            <div className="section-block accent" style={{marginBottom:0}}>
+              <h3 style={{fontSize:12.5}}>Vistoria de chegada</h3>
+              <p style={{fontSize:12.5,margin:'0 0 4px'}}><b>Combustível:</b> {viagem.combustivelFinal || "—"}</p>
+              <p style={{fontSize:12.5,margin:'0 0 4px'}}><b>Avarias:</b> {viagem.avariasFinal || "Nenhuma"}</p>
+              {viagem.obsFinal && <p style={{fontSize:12.5,margin:0}}><b>Obs.:</b> {viagem.obsFinal}</p>}
             </div>
           </div>
         )}
