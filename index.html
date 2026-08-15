@@ -4,6 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>RotaFrota — Controle de Veículos SEME</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#22262b">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="icon" href="./icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -11,6 +15,17 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<script>
+  window.__pwaDeferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    window.__pwaDeferredPrompt = e;
+    window.dispatchEvent(new Event('pwa-install-ready'));
+  });
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){ navigator.serviceWorker.register('./sw.js').catch(function(){}); });
+  }
+</script>
 <style>
   :root{
     --asfalto:#22262b;
@@ -119,6 +134,39 @@
   .stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent,var(--azul-estrada));}
   .stat .label{font-size:11px;color:var(--texto-suave);font-weight:600;text-transform:uppercase;letter-spacing:.03em;}
   .stat .value{font-size:23px;font-weight:700;margin-top:3px;font-family:'Space Grotesk';}
+  .stat-icon{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:8px;background:var(--accent,var(--azul-estrada));color:#fff;display:flex;align-items:center;justify-content:center;}
+
+  .hero-greet{display:flex;align-items:center;gap:14px;background:linear-gradient(120deg,var(--asfalto),var(--azul-estrada-2));border-radius:14px;padding:18px 20px;margin-bottom:18px;color:#fff;position:relative;overflow:hidden;}
+  .hero-greet::after{content:"";position:absolute;right:-30px;bottom:-30px;width:140px;height:140px;border-radius:999px;background:rgba(242,183,5,0.12);}
+  .hero-greet-icon{width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;z-index:1;}
+  .hero-greet-title{font-family:'Space Grotesk';font-size:17px;font-weight:700;position:relative;z-index:1;}
+  .hero-greet-sub{font-size:12.5px;color:#cfe0ea;margin-top:2px;position:relative;z-index:1;}
+  @media (max-width:480px){ .hero-greet{padding:15px 16px;} .hero-greet-title{font-size:15.5px;} }
+
+  .veiculo-grid{display:flex;flex-direction:column;gap:9px;}
+  .veiculo-card{display:flex;align-items:center;gap:12px;padding:12px 13px;border:1.5px solid var(--borda);border-radius:11px;background:#fff;text-align:left;width:100%;}
+  .veiculo-card:hover:not(.indisponivel){border-color:var(--azul-estrada);}
+  .veiculo-card.selected{border-color:var(--azul-estrada);background:#f2f7fa;box-shadow:0 0 0 3px rgba(47,102,144,0.12);}
+  .veiculo-card.indisponivel{opacity:.5;}
+  .veiculo-card-info{flex:1;min-width:0;}
+  .veiculo-card-info .placa{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:14px;}
+  .veiculo-card-info .modelo{font-size:11.5px;color:var(--texto-suave);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  .fuel-gauge-bar{height:14px;background:#eef1f3;border-radius:8px;overflow:hidden;border:1px solid var(--borda);margin-bottom:8px;}
+  .fuel-gauge-fill{height:100%;background:linear-gradient(90deg,var(--vermelho),var(--linha),var(--verde));transition:width .2s ease;}
+  .fuel-gauge-ticks{display:flex;gap:5px;}
+  .fuel-tick{flex:1;padding:7px 4px;border:1.5px solid var(--borda);border-radius:7px;background:#fff;font-size:11px;font-weight:600;color:var(--texto-suave);text-align:center;}
+  .fuel-tick.active{border-color:var(--azul-estrada);background:#f2f7fa;color:var(--azul-estrada-2);}
+
+  .viagem-card{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--borda);border-radius:12px;padding:13px 14px;text-align:left;box-shadow:var(--sombra);width:100%;}
+  .viagem-card:hover{border-color:var(--azul-estrada);}
+  .viagem-card-body{flex:1;min-width:0;}
+  .viagem-card-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:3px;}
+  .viagem-card-top .placa{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:14px;}
+  .viagem-card-meta{font-size:11.5px;color:var(--texto-suave);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .viagem-card-km{text-align:center;flex-shrink:0;padding-left:10px;border-left:1px solid var(--borda);min-width:52px;}
+  .viagem-card-km .km-value{font-size:17px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
+  .viagem-card-km .km-label{font-size:9.5px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.03em;}
 
   label{display:block;font-size:12.5px;font-weight:600;color:var(--texto-suave);margin-bottom:5px;}
   .field{margin-bottom:15px;}
@@ -264,6 +312,8 @@ const IconCamera=(p)=><Icon d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h
 const IconLogout=(p)=><Icon d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4 M16 17l5-5-5-5 M21 12H9" {...p}/>;
 const IconUser=(p)=><Icon d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2 M12 11a4 4 0 100-8 4 4 0 000 8z" {...p}/>;
 const IconRefresh=(p)=><Icon d="M23 4v6h-6 M1 20v-6h6 M3.5 9a9 9 0 0114.85-3.36L23 10 M20.5 15a9 9 0 01-14.85 3.36L1 14" {...p}/>;
+const IconDownload=(p)=><Icon d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4 M7 10l5 5 5-5 M12 15V3" {...p}/>;
+const IconClock=(p)=><Icon d="M12 21a9 9 0 100-18 9 9 0 000 18z M12 7v5l3.5 2" {...p}/>;
 
 /* ---------- dados fixos ---------- */
 const TIPO_COR = {"Passeio":"#2f6690","Utilitário":"#c99400","Van":"#3c8f5c","Ônibus":"#8a4fb0","Caminhão":"#c1443a"};
@@ -462,6 +512,25 @@ function AccessScreen({onEnter}){
   const [tipo,setTipo]=useState(null);
   const [nome,setNome]=useState("");
   const [erro,setErro]=useState("");
+  const [instalarDisponivel,setInstalarDisponivel]=useState(!!window.__pwaDeferredPrompt);
+
+  useEffect(()=>{
+    const onReady = ()=>setInstalarDisponivel(true);
+    window.addEventListener('pwa-install-ready', onReady);
+    return ()=>window.removeEventListener('pwa-install-ready', onReady);
+  },[]);
+
+  const instalarApp = async () => {
+    const evt = window.__pwaDeferredPrompt;
+    if(!evt) return;
+    evt.prompt();
+    try{ await evt.userChoice; }catch(e){}
+    window.__pwaDeferredPrompt = null;
+    setInstalarDisponivel(false);
+  };
+
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone;
 
   const confirmarMotorista=()=>{
     if(!nome.trim()) return setErro("Informe seu nome para continuar.");
@@ -508,6 +577,13 @@ function AccessScreen({onEnter}){
 
           {tipo==="motorista" && <button className="btn btn-accent btn-block" onClick={confirmarMotorista}><IconPlay size={16}/> Continuar</button>}
           {tipo==="admin" && <button className="btn btn-accent btn-block" onClick={()=>onEnter({nome:"Administrador", tipo:"admin"})}><IconGrid size={16}/> Entrar no painel</button>}
+
+          {!isStandalone && instalarDisponivel && (
+            <button type="button" className="btn btn-ghost btn-block" style={{marginTop:12}} onClick={instalarApp}><IconDownload size={15}/> Instalar app no celular</button>
+          )}
+          {!isStandalone && !instalarDisponivel && isIOS && (
+            <p style={{fontSize:11.5,color:'var(--texto-suave)',marginTop:14,textAlign:'center'}}>No iPhone: toque em <b>Compartilhar</b> e depois em <b>"Adicionar à Tela de Início"</b> para instalar o app.</p>
+          )}
         </div>
       </div>
     </div>
@@ -655,17 +731,21 @@ function App(){
 
 /* ---------- checklist de vistoria (combustível + avarias + observações) ---------- */
 const AVARIA_OPCOES = ["Pneus","Lataria/Pintura","Para-brisa/Vidros","Bancos/Estofado","Outro"];
+const NIVEIS_COMBUSTIVEL = [{v:"Reserva",pct:10},{v:"1/4",pct:25},{v:"1/2",pct:50},{v:"3/4",pct:75},{v:"Cheio",pct:100}];
 function VistoriaChecklist({combustivel, setCombustivel, avarias, setAvarias, obs, setObs, titulo}){
   const toggleAvaria = (op) => setAvarias(prev => prev.includes(op) ? prev.filter(a=>a!==op) : [...prev, op]);
+  const nivelAtual = NIVEIS_COMBUSTIVEL.find(n=>n.v===combustivel);
   return (
     <div className="section-block ok">
       <h3><IconClip size={15}/> {titulo || "Vistoria do veículo"}</h3>
       <div className="field">
         <label>Nível de combustível<span style={{color:'var(--vermelho)'}}> *</span></label>
-        <select value={combustivel} onChange={e=>setCombustivel(e.target.value)}>
-          <option value="">Selecione</option>
-          <option>Reserva</option><option>1/4</option><option>1/2</option><option>3/4</option><option>Cheio</option>
-        </select>
+        <div className="fuel-gauge-bar"><div className="fuel-gauge-fill" style={{width:(nivelAtual?nivelAtual.pct:0)+'%'}}></div></div>
+        <div className="fuel-gauge-ticks">
+          {NIVEIS_COMBUSTIVEL.map(n=>(
+            <button key={n.v} type="button" className={"fuel-tick"+(combustivel===n.v?" active":"")} onClick={()=>setCombustivel(n.v)}>{n.v}</button>
+          ))}
+        </div>
       </div>
       <div className="field">
         <label>Avarias observadas (opcional)</label>
@@ -712,20 +792,24 @@ function NovaViagem({user, veiculos, veiculoDisponivel, onIniciar}){
   };
 
   const veiculoSel = veiculos.find(v=>v.id===veiculoId);
+  const saudacao = (()=>{ const h=new Date().getHours(); return h<12?"Bom dia":(h<18?"Boa tarde":"Boa noite"); })();
 
   return (
     <div>
-      <div className="page-head">
-        <div className="badge"><IconPlay size={18} color="#fff"/></div>
-        <div><h1>Iniciar viagem</h1><p>Olá, {user.nome.split(" ")[0]} — preencha antes de sair</p></div>
+      <div className="hero-greet">
+        <div className="hero-greet-icon"><IconCar size={24} color="#fff"/></div>
+        <div>
+          <div className="hero-greet-title">{saudacao}, {user.nome.split(" ")[0]}!</div>
+          <div className="hero-greet-sub">Preencha os dados abaixo antes de sair com o veículo</div>
+        </div>
       </div>
 
       <div className="stepper">
-        <div className={"step "+(passo1ok?"done":"active")}><div className="dot">{passo1ok?<IconCheck size={13}/>:"1"}</div><span className="txt">Veículo</span></div>
+        <div className={"step "+(passo1ok?"done":"active")}><div className="dot">{passo1ok?<IconCheck size={13}/>:<IconCar size={13}/>}</div><span className="txt">Veículo</span></div>
         <div className={"line"+(passo1ok?" done":"")}></div>
-        <div className={"step "+(passo2ok?"done":(passo1ok?"active":""))}><div className="dot">{passo2ok?<IconCheck size={13}/>:"2"}</div><span className="txt">KM + foto</span></div>
+        <div className={"step "+(passo2ok?"done":(passo1ok?"active":""))}><div className="dot">{passo2ok?<IconCheck size={13}/>:<IconGauge size={13}/>}</div><span className="txt">KM + foto</span></div>
         <div className={"line"+(passo2ok?" done":"")}></div>
-        <div className={"step "+(passo2ok?"active":"")}><div className="dot">3</div><span className="txt">Iniciar</span></div>
+        <div className={"step "+(passo2ok?"active":"")}><div className="dot"><IconPlay size={12}/></div><span className="txt">Iniciar</span></div>
       </div>
 
       <div className="card" style={{maxWidth:520}}>
@@ -733,20 +817,26 @@ function NovaViagem({user, veiculos, veiculoDisponivel, onIniciar}){
           <h3><IconCar size={15}/> Veículo e destino</h3>
           <div className="field">
             <label>Placa do veículo</label>
-            <select value={veiculoId} onChange={e=>setVeiculoId(e.target.value)}>
-              <option value="">Selecione</option>
+            <div className="veiculo-grid">
               {veiculos.map(v=>{
                 const disp = veiculoDisponivel(v);
-                return <option key={v.id} value={v.id} disabled={!disp}>{v.placa} · {v.modelo} {disp?"":"(em uso)"}</option>;
+                const cor = TIPO_COR[v.tipo]||'#2f6690';
+                return (
+                  <button key={v.id} type="button" disabled={!disp}
+                    className={"veiculo-card"+(veiculoId===v.id?" selected":"")+(!disp?" indisponivel":"")}
+                    onClick={()=>setVeiculoId(v.id)}>
+                    <div className="vic" style={{background:cor}}><IconCar size={19}/></div>
+                    <div className="veiculo-card-info">
+                      <div className="placa">{v.placa}</div>
+                      <div className="modelo">{v.modelo} · {v.tipo}</div>
+                    </div>
+                    {!disp ? <span className="pill pill-uso">Em uso</span> : (veiculoId===v.id && <IconCheck size={17} color="var(--azul-estrada)"/>)}
+                  </button>
+                );
               })}
-            </select>
-          </div>
-          {veiculoSel && (
-            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
-              <div className="vic" style={{background:TIPO_COR[veiculoSel.tipo]||'#2f6690'}}><IconCar size={19}/></div>
-              <div style={{fontSize:12.5,color:'var(--texto-suave)'}}>{veiculoSel.tipo} selecionado</div>
+              {veiculos.length===0 && <p style={{fontSize:12.5,color:'var(--texto-suave)',margin:0}}>Nenhum veículo cadastrado ainda.</p>}
             </div>
-          )}
+          </div>
           <div className="field" style={{marginBottom:0}}>
             <label>Finalidade / destino (opcional)</label>
             <input type="text" placeholder="Ex: Entrega de documentos na EMEIEF..." value={finalidade} onChange={e=>setFinalidade(e.target.value)}/>
@@ -787,9 +877,12 @@ function NovaViagem({user, veiculos, veiculoDisponivel, onIniciar}){
 function ViagemAndamento({viagem, veiculos, onFinalizar}){
   const veiculo = veiculos.find(v=>v.id===viagem.veiculoId);
   const STORAGE_KEY = 'rotafrota_pendentes_' + viagem.id;
+  const ACCURACY_LIMIT_M = 60; // leituras com precisão pior que isso (em metros) são descartadas
   const [agora,setAgora]=useState(Date.now());
   const [statusGps,setStatusGps]=useState("aguardando");
   const [pontos,setPontos]=useState([]);
+  const [velocidade,setVelocidade]=useState(null); // km/h
+  const [descartados,setDescartados]=useState(0);
   const [online,setOnline]=useState(navigator.onLine);
   const [kmFinal,setKmFinal]=useState("");
   const [fotoFinal,setFotoFinal]=useState(null);
@@ -816,10 +909,14 @@ function ViagemAndamento({viagem, veiculos, onFinalizar}){
   const persistBuffer = () => { try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(bufferRef.current)); }catch(e){} };
 
   const registrarPonto = (pos, origem) => {
-    const ponto = {lat:pos.coords.latitude, lng:pos.coords.longitude, t:Date.now(), acc:pos.coords.accuracy, origem};
+    const acc = pos.coords.accuracy;
+    // descarta leituras muito imprecisas (comum perto de prédios altos, garagens, túneis) para não sujar o trajeto
+    if(acc != null && acc > ACCURACY_LIMIT_M){ setDescartados(d=>d+1); return; }
+    const ponto = {lat:pos.coords.latitude, lng:pos.coords.longitude, t:Date.now(), acc, origem};
     setPontos(prev=>[...prev, ponto]);
     bufferRef.current.push(ponto);
     persistBuffer();
+    if(pos.coords.speed != null && pos.coords.speed >= 0) setVelocidade(pos.coords.speed * 3.6);
   };
 
   useEffect(()=>{
@@ -895,16 +992,24 @@ function ViagemAndamento({viagem, veiculos, onFinalizar}){
         </div>
       )}
 
-      <div className="grid grid-3" style={{marginBottom:14}}>
+      <div className="grid grid-4" style={{marginBottom:14}}>
         <div className="stat" style={{'--accent':'var(--verde)'}}>
+          <div className="stat-icon"><IconClock size={14}/></div>
           <div className="label">Tempo</div>
           <div className="value mono">{fmtDur(duracao)}</div>
         </div>
         <div className="stat" style={{'--accent':'var(--azul-estrada)'}}>
+          <div className="stat-icon"><IconMap size={14}/></div>
           <div className="label">Distância</div>
           <div className="value mono">{kmFmt(distancia)}</div>
         </div>
         <div className="stat" style={{'--accent':'var(--linha-escura)'}}>
+          <div className="stat-icon"><IconGauge size={14}/></div>
+          <div className="label">Velocidade</div>
+          <div className="value mono">{velocidade!=null ? Math.round(velocidade)+" km/h" : "—"}</div>
+        </div>
+        <div className="stat" style={{'--accent':'#8a4fb0'}}>
+          <div className="stat-icon"><IconPin size={14}/></div>
           <div className="label">Pontos GPS</div>
           <div className="value mono">{pontos.length}</div>
         </div>
@@ -925,7 +1030,7 @@ function ViagemAndamento({viagem, veiculos, onFinalizar}){
         <div style={{marginTop:12}}>
           <button className="btn btn-ghost" onClick={checkpointManual}><IconPin size={15}/> Registrar minha localização agora</button>
         </div>
-        <p style={{fontSize:11.5,color:'var(--texto-suave)',marginTop:10,marginBottom:0}}>O rastreamento roda enquanto este app estiver na tela, e os pontos são enviados à planilha a cada 15 segundos. Se a tela travar, trocar de app ou faltar internet, o registro continua salvo neste celular e é enviado assim que possível.</p>
+        <p style={{fontSize:11.5,color:'var(--texto-suave)',marginTop:10,marginBottom:0}}>O rastreamento roda enquanto este app estiver na tela, e os pontos são enviados à planilha a cada 15 segundos. Se a tela travar, trocar de app ou faltar internet, o registro continua salvo neste celular e é enviado assim que possível.{descartados>0 ? " "+descartados+" leitura(s) imprecisa(s) foram descartadas automaticamente." : ""}</p>
       </div>
 
       {erro && <div className="banner-error" style={{marginBottom:14}}><IconAlert size={15}/><span>{erro}</span></div>}
@@ -967,30 +1072,34 @@ function MinhasViagens({viagens, veiculos, onAbrir}){
         <div className="badge"><IconClip size={18} color="#fff"/></div>
         <div><h1>Minhas viagens</h1><p>Seu histórico de uso de veículos</p></div>
       </div>
-      <div className="card">
-        {viagens.length===0 ? <p style={{color:'var(--texto-suave)',fontSize:13.5}}>Nenhuma viagem registrada ainda.</p> : (
-        <div className="tablewrap">
-          <table>
-            <thead><tr><th>Veículo</th><th>Início</th><th>KM inicial</th><th>KM final</th><th>Rodado</th><th>Status</th></tr></thead>
-            <tbody>
-              {viagens.map(v=>{
-                const veic = veiculos.find(x=>x.id===v.veiculoId);
-                return (
-                  <tr key={v.id} className="rowlink" onClick={()=>onAbrir(v)}>
-                    <td>{veic?.placa}</td>
-                    <td>{fmtDate(v.inicio)}</td>
-                    <td className="mono">{v.kmInicial}</td>
-                    <td className="mono">{v.kmFinal ?? "—"}</td>
-                    <td className="mono">{v.kmFinal ? (v.kmFinal-v.kmInicial)+" km" : "—"}</td>
-                    <td><span className={"pill "+(v.status==="em_andamento"?"pill-andamento":"pill-concluida")}>{v.status==="em_andamento"?"Em andamento":"Concluída"}</span></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {viagens.length===0 ? (
+        <div className="card"><p style={{color:'var(--texto-suave)',fontSize:13.5,margin:0}}>Nenhuma viagem registrada ainda.</p></div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {viagens.map(v=>{
+            const veic = veiculos.find(x=>x.id===v.veiculoId);
+            const cor = TIPO_COR[veic && veic.tipo] || '#2f6690';
+            const rodado = v.kmFinal ? (v.kmFinal - v.kmInicial) : null;
+            return (
+              <button key={v.id} className="viagem-card" onClick={()=>onAbrir(v)}>
+                <div className="vic" style={{background:cor}}><IconCar size={19}/></div>
+                <div className="viagem-card-body">
+                  <div className="viagem-card-top">
+                    <span className="placa">{veic ? veic.placa : "—"}</span>
+                    <span className={"pill "+(v.status==="em_andamento"?"pill-andamento":"pill-concluida")}>{v.status==="em_andamento"?"Em andamento":"Concluída"}</span>
+                  </div>
+                  <div className="viagem-card-meta">{fmtDate(v.inicio)}{veic ? " · "+veic.modelo : ""}</div>
+                  {v.finalidade && <div className="viagem-card-meta">{v.finalidade}</div>}
+                </div>
+                <div className="viagem-card-km">
+                  <div className="km-value">{rodado!=null ? rodado : "—"}</div>
+                  <div className="km-label">km</div>
+                </div>
+              </button>
+            );
+          })}
         </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
