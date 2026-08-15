@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>RotaFrota — Controle de Veículos SEME</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<style>
+  :root{
+    --asfalto:#22262b;
+    --asfalto-2:#2b3038;
+    --concreto:#eef1f3;
+    --concreto-2:#ffffff;
+    --linha:#f2b705;
+    --linha-escura:#c99400;
+    --azul-estrada:#2f6690;
+    --azul-estrada-2:#1f4a6b;
+    --verde:#3c8f5c;
+    --verde-bg:#e6f4ea;
+    --vermelho:#c1443a;
+    --vermelho-bg:#fbe9e7;
+    --texto:#1d2024;
+    --texto-suave:#5c6470;
+    --borda:#dde2e6;
+    --sombra: 0 1px 2px rgba(20,22,26,0.06), 0 4px 14px rgba(20,22,26,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--concreto);color:var(--texto);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;letter-spacing:-0.01em;}
+  .mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+  ::selection{background:var(--linha);color:var(--asfalto);}
+  img{max-width:100%;}
+
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--asfalto) 0%,var(--azul-estrada-2) 100%);padding:18px;}
+  .login-card{width:100%;max-width:800px;background:#fff;border-radius:18px;overflow:hidden;display:flex;box-shadow:0 20px 60px rgba(0,0,0,0.32);}
+  .login-left{flex:1;background:linear-gradient(160deg,var(--asfalto) 0%,var(--azul-estrada-2) 100%);color:#fff;padding:34px 30px;display:flex;flex-direction:column;justify-content:space-between;position:relative;min-height:300px;}
+  .login-right{flex:1;padding:36px 32px;}
+  .roadline{position:absolute;left:0;right:0;bottom:64px;height:3px;background:repeating-linear-gradient(90deg,var(--linha) 0 22px,transparent 22px 40px);opacity:.85;}
+  .login-icongrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px;position:relative;z-index:1;}
+  .login-icongrid div{width:100%;aspect-ratio:1;border-radius:10px;background:rgba(255,255,255,0.09);display:flex;align-items:center;justify-content:center;color:#f2b705;}
+  .login-badge{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#cfe0ea;background:rgba(255,255,255,0.08);padding:5px 10px;border-radius:999px;width:fit-content;}
+  .access-card{flex:1;min-width:150px;display:flex;align-items:center;gap:10px;padding:14px;border:1.5px solid var(--borda);border-radius:12px;background:#fff;text-align:left;}
+  .access-card:hover{border-color:var(--azul-estrada);}
+  .access-card.active{border-color:var(--azul-estrada);background:#f2f7fa;box-shadow:0 0 0 3px rgba(47,102,144,0.12);}
+  @media (max-width:680px){ .login-card{flex-direction:column;} .login-left{padding:22px 24px;min-height:auto;} .login-icongrid{display:none;} .roadline{display:none;} }
+
+  .app{display:flex;min-height:100vh;}
+  .sidebar{width:236px;background:var(--asfalto);color:#cfd4da;flex-shrink:0;display:flex;flex-direction:column;transition:width .2s ease;}
+  .sidebar.collapsed{width:72px;}
+  .sidebar-head{display:flex;align-items:center;gap:10px;padding:20px 18px;border-bottom:1px solid rgba(255,255,255,0.08);}
+  .logo-mark{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--linha),var(--linha-escura));display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .logo-text{color:#fff;font-weight:700;font-size:16.5px;white-space:nowrap;overflow:hidden;}
+  .logo-text small{display:block;font-family:'Inter';font-weight:500;font-size:10.5px;color:#9aa3ad;letter-spacing:.03em;text-transform:uppercase;}
+  .nav{padding:14px 10px;display:flex;flex-direction:column;gap:3px;flex:1;}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:8px;color:#c2c8cf;background:none;border:none;text-align:left;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;}
+  .nav-item svg{flex-shrink:0;}
+  .nav-item:hover{background:rgba(255,255,255,0.06);color:#fff;}
+  .nav-item.active{background:var(--linha);color:var(--asfalto);font-weight:600;}
+  .nav-label{opacity:1;transition:opacity .15s;}
+  .sidebar.collapsed .nav-label,.sidebar.collapsed .logo-text{display:none;}
+  .user-box{margin:8px 10px 4px;padding:11px 12px;background:rgba(255,255,255,0.06);border-radius:10px;display:flex;align-items:center;gap:9px;}
+  .avatar{width:32px;height:32px;border-radius:999px;background:var(--azul-estrada);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;flex-shrink:0;}
+  .user-box .who{overflow:hidden;}
+  .user-box .who .n{font-size:12.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .user-box .who .t{font-size:10.5px;color:#9aa3ad;text-transform:uppercase;letter-spacing:.03em;}
+  .sidebar.collapsed .user-box{display:none;}
+  .logout-btn{margin:2px 10px 14px;display:flex;align-items:center;gap:8px;background:none;border:1px solid rgba(255,255,255,0.14);color:#c2c8cf;padding:9px 12px;border-radius:8px;font-size:12.5px;font-weight:600;}
+  .logout-btn:hover{background:rgba(255,255,255,0.06);color:#fff;}
+  .sidebar.collapsed .logout-btn span{display:none;}
+  .sidebar-foot{padding:12px 14px;border-top:1px solid rgba(255,255,255,0.08);font-size:11.5px;color:#8b939c;white-space:nowrap;overflow:hidden;}
+  .sidebar.collapsed .sidebar-foot{display:none;}
+
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .topbar{height:58px;background:var(--asfalto-2);display:flex;align-items:center;justify-content:space-between;padding:0 18px;flex-shrink:0;}
+  .burger{background:none;border:none;color:#cfd4da;padding:6px;border-radius:6px;display:flex;}
+  .burger:hover{background:rgba(255,255,255,0.08);}
+  .top-title{color:#fff;font-weight:600;font-size:14.5px;}
+  .top-right{display:flex;align-items:center;gap:10px;color:#cfd4da;font-size:12.5px;}
+  .content{padding:24px 28px 60px;max-width:1180px;margin:0 auto;width:100%;padding-bottom:max(40px, env(safe-area-inset-bottom));}
+  @media (max-width:640px){ .content{padding:14px 12px 90px;} .top-title{font-size:13px;} }
+
+  .page-head{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+  .page-head .badge{width:38px;height:38px;border-radius:10px;background:var(--azul-estrada);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .page-head h1{font-size:20px;margin:0;}
+  .page-head p{margin:2px 0 0;color:var(--texto-suave);font-size:12.5px;}
+  @media (max-width:480px){ .page-head h1{font-size:17px;} .page-head .badge{width:34px;height:34px;} }
+
+  .card{background:var(--concreto-2);border:1px solid var(--borda);border-radius:14px;box-shadow:var(--sombra);padding:20px;}
+  @media (max-width:480px){ .card{padding:15px;border-radius:12px;} }
+  .grid{display:grid;gap:14px;}
+  .grid-3{grid-template-columns:repeat(3,1fr);}
+  .grid-4{grid-template-columns:repeat(4,1fr);}
+  @media (max-width:820px){.grid-3,.grid-4{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:480px){.grid-3,.grid-4{grid-template-columns:1fr 1fr;gap:9px;}}
+
+  .stat{border-radius:12px;padding:14px 16px;background:var(--concreto-2);border:1px solid var(--borda);position:relative;overflow:hidden;}
+  .stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent,var(--azul-estrada));}
+  .stat .label{font-size:11px;color:var(--texto-suave);font-weight:600;text-transform:uppercase;letter-spacing:.03em;}
+  .stat .value{font-size:23px;font-weight:700;margin-top:3px;font-family:'Space Grotesk';}
+
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--texto-suave);margin-bottom:5px;}
+  .field{margin-bottom:15px;}
+  input[type=text],input[type=number],input[type=password],select,textarea{
+    width:100%;padding:12px 13px;border:1.5px solid var(--borda);border-radius:9px;font-size:16px;background:#fff;color:var(--texto);
+  }
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--azul-estrada);box-shadow:0 0 0 3px rgba(47,102,144,0.14);}
+  .btn{border:none;border-radius:10px;padding:13px 18px;font-weight:600;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;}
+  .btn-primary{background:var(--azul-estrada);color:#fff;}
+  .btn-primary:hover{background:var(--azul-estrada-2);}
+  .btn-accent{background:var(--linha);color:var(--asfalto);}
+  .btn-accent:hover{background:var(--linha-escura);}
+  .btn-ghost{background:none;color:var(--texto-suave);border:1.5px solid var(--borda);}
+  .btn-ghost:hover{background:#f4f6f7;}
+  .btn-danger{background:var(--vermelho-bg);color:var(--vermelho);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .btn-block{width:100%;}
+
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;}
+  .pill-andamento{background:var(--verde-bg);color:var(--verde);}
+  .pill-concluida{background:#e8eef2;color:var(--azul-estrada-2);}
+  .pill-disponivel{background:var(--verde-bg);color:var(--verde);}
+  .pill-uso{background:#fdf1da;color:#9a6a00;}
+  .pill-erro{background:var(--vermelho-bg);color:var(--vermelho);}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{text-align:left;padding:9px 12px;color:var(--texto-suave);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1.5px solid var(--borda);}
+  td{padding:11px 12px;border-bottom:1px solid #eef0f2;}
+  tr.rowlink:hover{background:#f7f9fa;cursor:pointer;}
+  .tablewrap{overflow-x:auto;}
+
+  .odo{background:var(--asfalto);border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .odo .digits{background:#000;color:var(--linha);font-size:24px;padding:7px 14px;border-radius:6px;letter-spacing:2px;font-weight:600;}
+  .odo .odo-label{color:#9aa3ad;font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:600;}
+
+  .section-block{border-left:4px solid var(--azul-estrada);background:#f6f9fb;border-radius:0 10px 10px 0;padding:15px 16px;margin-bottom:14px;}
+  .section-block.accent{border-left-color:var(--linha);background:#fffbec;}
+  .section-block.ok{border-left-color:var(--verde);background:#f2faf5;}
+  .section-block h3{font-size:13px;margin:0 0 11px;display:flex;align-items:center;gap:7px;}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(20,22,26,0.55);display:flex;align-items:center;justify-content:center;z-index:50;padding:14px;}
+  .modal{background:#fff;border-radius:14px;max-width:640px;width:100%;max-height:88vh;overflow-y:auto;padding:24px;}
+  .modal-close{position:absolute;top:14px;right:14px;}
+
+  .banner-ok{background:var(--verde-bg);border:1.5px solid #b8dfc5;border-radius:12px;padding:18px;display:flex;gap:14px;align-items:flex-start;margin-bottom:18px;}
+  .banner-warn{background:#fff4e0;border:1.5px solid #f0d29a;border-radius:12px;padding:13px 15px;display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:#8a5b00;}
+  .banner-error{background:var(--vermelho-bg);border:1.5px solid #f0bcb6;border-radius:12px;padding:13px 15px;display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--vermelho);}
+
+  .route-box{background:var(--asfalto);border-radius:12px;padding:8px;position:relative;}
+  .route-svg{width:100%;height:auto;display:block;border-radius:8px;}
+
+  .flexwrap{display:flex;flex-wrap:wrap;gap:10px;}
+
+  .stepper{display:flex;align-items:center;margin-bottom:20px;}
+  .step{display:flex;align-items:center;gap:8px;flex:1;}
+  .step .dot{width:26px;height:26px;border-radius:999px;background:#dde2e6;color:#8a939c;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;flex-shrink:0;transition:all .2s;}
+  .step.active .dot{background:var(--azul-estrada);color:#fff;}
+  .step.done .dot{background:var(--verde);color:#fff;}
+  .step .line{height:2px;background:#dde2e6;flex:1;}
+  .step.done .line{background:var(--verde);}
+  .step .txt{font-size:11px;color:var(--texto-suave);font-weight:600;display:none;}
+  @media (min-width:640px){ .step .txt{display:block;} }
+
+  .camera-box{width:100%;border:2px dashed #b8c2ca;background:#f6f9fb;border-radius:12px;padding:22px 16px;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--azul-estrada-2);font-weight:600;font-size:13.5px;}
+  .camera-box:hover{background:#eef3f6;border-color:var(--azul-estrada);}
+  .camera-box:disabled{opacity:.6;}
+  .thumb-wrap img{width:100%;max-height:220px;object-fit:cover;border-radius:10px;border:1px solid var(--borda);}
+
+  .sticky-actions{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(238,241,243,0) 0%,var(--concreto) 22%);padding:14px 0 6px;margin-top:6px;}
+
+  .vic{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;}
+
+  .spinner{width:16px;height:16px;border-radius:999px;border:2.5px solid rgba(255,255,255,0.4);border-top-color:#fff;animation:spin .7s linear infinite;display:inline-block;}
+  .spinner-dark{border:2.5px solid rgba(34,38,43,0.2);border-top-color:var(--asfalto);}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--concreto);}
+  .config-card{max-width:560px;width:100%;background:#fff;border-radius:16px;padding:30px;box-shadow:var(--sombra);}
+  .config-card code{background:#f2f4f6;padding:2px 6px;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;}
+  .config-card ol{padding-left:20px;font-size:13.5px;line-height:1.9;color:var(--texto);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const {useState,useEffect,useRef} = React;
+
+/* =========================================================
+   CONFIGURAÇÃO — cole aqui a URL do seu Apps Script (/exec)
+   ========================================================= */
+const CONFIG = {
+  API_URL: "https://script.google.com/macros/s/AKfycbxPb2OWLrfl4Z5n0L08OImd5X70Qf4pGynZBlQlZ6Q7zyb-OEkCuBf8K_-ATRQ5QaQw/exec"
+};
+
+/* ---------- cliente da API (Google Apps Script) ---------- */
+async function apiGet(action, params){
+  params = params || {};
+  const url = new URL(CONFIG.API_URL);
+  url.searchParams.set('action', action);
+  Object.keys(params).forEach(k=>url.searchParams.set(k, params[k]));
+  const res = await fetch(url.toString());
+  if(!res.ok) throw new Error("Falha ao conectar com a planilha (HTTP "+res.status+")");
+  const data = await res.json();
+  if(data && data.erro) throw new Error(data.erro);
+  return data;
+}
+async function apiPost(action, payload){
+  payload = payload || {};
+  // Content-Type text/plain evita o preflight OPTIONS, que o Apps Script não responde.
+  const res = await fetch(CONFIG.API_URL, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify(Object.assign({action:action}, payload))
+  });
+  if(!res.ok) throw new Error("Falha ao conectar com a planilha (HTTP "+res.status+")");
+  const data = await res.json();
+  if(data && data.erro) throw new Error(data.erro);
+  return data;
+}
+
+/* ---------- ícones ---------- */
+const Icon = ({d,size=18,...p}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d={d}/></svg>
+);
+const IconCar=(p)=><Icon d="M5 17h14M5 17a2 2 0 104 0M15 17a2 2 0 104 0M3 13l2-6a2 2 0 012-1h10a2 2 0 012 1l2 6M3 13v3a1 1 0 001 1h1M21 13v3a1 1 0 01-1 1h-1M3 13h18" {...p}/>;
+const IconMap=(p)=><Icon d="M9 4l-6 2v14l6-2 6 2 6-2V4l-6 2-6-2z M9 4v14 M15 6v14" {...p}/>;
+const IconGauge=(p)=><Icon d="M12 21a9 9 0 100-18 9 9 0 000 18z M12 12l4-4 M12 12v0" {...p}/>;
+const IconClip=(p)=><Icon d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2 M9 5a2 2 0 012-2h2a2 2 0 012 2 M9 5a2 2 0 002 2h2a2 2 0 002-2 M9 13l2 2 4-4" {...p}/>;
+const IconGrid=(p)=><Icon d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" {...p}/>;
+const IconBar=(p)=><Icon d="M3 3v18h18 M7 17V10 M12 17V6 M17 17v-4" {...p}/>;
+const IconPin=(p)=><Icon d="M12 21s-7-6.2-7-11a7 7 0 1114 0c0 4.8-7 11-7 11z M12 12a2 2 0 100-4 2 2 0 000 4z" {...p}/>;
+const IconPlay=(p)=><Icon d="M5 3l14 9-14 9V3z" {...p}/>;
+const IconFlag=(p)=><Icon d="M5 21V4 M5 4h13l-3 4 3 4H5" {...p}/>;
+const IconMenu=(p)=><Icon d="M3 6h18M3 12h18M3 18h18" {...p}/>;
+const IconCheck=(p)=><Icon d="M20 6L9 17l-5-5" {...p}/>;
+const IconAlert=(p)=><Icon d="M12 9v4 M12 17h.01 M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" {...p}/>;
+const IconX=(p)=><Icon d="M18 6L6 18M6 6l12 12" {...p}/>;
+const IconTruck=(p)=><Icon d="M1 3h13v13H1zM14 8h4l3 3v5h-7V8z M6.5 20a2 2 0 100-4 2 2 0 000 4z M18 20a2 2 0 100-4 2 2 0 000 4z" {...p}/>;
+const IconCamera=(p)=><Icon d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z M12 17a4 4 0 100-8 4 4 0 000 8z" {...p}/>;
+const IconLogout=(p)=><Icon d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4 M16 17l5-5-5-5 M21 12H9" {...p}/>;
+const IconUser=(p)=><Icon d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2 M12 11a4 4 0 100-8 4 4 0 000 8z" {...p}/>;
+const IconRefresh=(p)=><Icon d="M23 4v6h-6 M1 20v-6h6 M3.5 9a9 9 0 0114.85-3.36L23 10 M20.5 15a9 9 0 01-14.85 3.36L1 14" {...p}/>;
+
+/* ---------- dados fixos ---------- */
+const TIPO_COR = {"Passeio":"#2f6690","Utilitário":"#c99400","Van":"#3c8f5c","Ônibus":"#8a4fb0","Caminhão":"#c1443a"};
+
+/* ---------- utils ---------- */
+const fmtDate = (d) => new Date(d).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+const fmtDur = (ms) => { const s=Math.floor(ms/1000); const h=Math.floor(s/3600); const m=Math.floor((s%3600)/60); const ss=s%60; return (h?h+"h ":"")+String(m).padStart(2,'0')+"m "+String(ss).padStart(2,'0')+"s"; };
+const initials = (nome) => nome.split(" ").filter(Boolean).slice(0,2).map(p=>p[0]).join("").toUpperCase();
+const haversine = (a,b) => {
+  const R=6371000, toRad = d=>d*Math.PI/180;
+  const dLat=toRad(b.lat-a.lat), dLon=toRad(b.lng-a.lng);
+  const la1=toRad(a.lat), la2=toRad(b.lat);
+  const h = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+};
+const distanciaTotal = (pontos) => { let d=0; for(let i=1;i<pontos.length;i++) d+=haversine(pontos[i-1],pontos[i]); return d; };
+const kmFmt = (m) => (m/1000).toFixed(2).replace('.',',')+" km";
+
+/* comprime a foto no navegador antes de enviar (reduz dados e Drive) */
+function compressImage(file, maxWidth, quality){
+  maxWidth = maxWidth || 1280; quality = quality || 0.72;
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if(w > maxWidth){ h = Math.round(h * (maxWidth / w)); w = maxWidth; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ---------- mapa de rota (SVG próprio) ---------- */
+function RouteSVG({pontos, height=210}){
+  if(!pontos || pontos.length===0){
+    return <div className="route-box" style={{height, display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <span style={{color:'#9aa3ad',fontSize:13}}>Aguardando sinal de GPS…</span>
+    </div>;
+  }
+  const lats = pontos.map(p=>p.lat), lngs = pontos.map(p=>p.lng);
+  let minLat=Math.min(...lats), maxLat=Math.max(...lats), minLng=Math.min(...lngs), maxLng=Math.max(...lngs);
+  const padLat=(maxLat-minLat)||0.0008, padLng=(maxLng-minLng)||0.0008;
+  minLat-=padLat*0.25; maxLat+=padLat*0.25; minLng-=padLng*0.25; maxLng+=padLng*0.25;
+  const W=560,H=height-16;
+  const x = (lng)=> ((lng-minLng)/(maxLng-minLng||1))*W;
+  const y = (lat)=> H-((lat-minLat)/(maxLat-minLat||1))*H;
+  const pathD = pontos.map((p,i)=> (i===0?"M":"L")+x(p.lng).toFixed(1)+","+y(p.lat).toFixed(1)).join(" ");
+  const start = pontos[0], end = pontos[pontos.length-1];
+  return (
+    <div className="route-box">
+      <svg className="route-svg" viewBox={`0 0 ${W} ${height}`} xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+            <path d="M28 0H0V28" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1"/>
+          </pattern>
+          <linearGradient id="roadGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#f2b705"/>
+            <stop offset="100%" stopColor="#2f6690"/>
+          </linearGradient>
+        </defs>
+        <rect width={W} height={height} fill="url(#grid)"/>
+        <path d={pathD} fill="none" stroke="url(#roadGrad)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx={x(start.lng)} cy={y(start.lat)} r="6" fill="#3c8f5c" stroke="#fff" strokeWidth="2"/>
+        <circle cx={x(end.lng)} cy={y(end.lat)} r="7" fill="#f2b705" stroke="#22262b" strokeWidth="2">
+          <animate attributeName="r" values="7;10;7" dur="1.6s" repeatCount="indefinite"/>
+        </circle>
+      </svg>
+    </div>
+  );
+}
+
+/* ---------- captura de foto (câmera direta, comprimida) ---------- */
+function CameraCapture({label, value, onChange, required}){
+  const inputRef = useRef();
+  const [processando,setProcessando]=useState(false);
+  return (
+    <div className="field" style={{marginBottom:8}}>
+      <label>{label}{required && <span style={{color:'var(--vermelho)'}}> *</span>}</label>
+      {!value ? (
+        <button type="button" className="camera-box" disabled={processando} onClick={()=>inputRef.current.click()}>
+          {processando ? <span className="spinner spinner-dark"></span> : <IconCamera size={26}/>}
+          <span>{processando ? "Processando foto…" : "Tirar foto do painel de KM"}</span>
+        </button>
+      ) : (
+        <div className="thumb-wrap">
+          <img src={value} alt="Foto do painel"/>
+          <div className="flexwrap" style={{marginTop:8}}>
+            <button type="button" className="btn btn-ghost" onClick={()=>inputRef.current.click()}><IconCamera size={15}/> Tirar outra</button>
+            <button type="button" className="btn btn-danger" onClick={()=>onChange(null)}><IconX size={14}/> Remover</button>
+          </div>
+        </div>
+      )}
+      <input ref={inputRef} type="file" accept="image/*" capture="environment" style={{display:'none'}}
+        onChange={async (e)=>{
+          const file=e.target.files[0]; if(!file) return;
+          setProcessando(true);
+          try{ const dataUrl = await compressImage(file); onChange(dataUrl); }
+          catch(err){ alert("Não foi possível processar a foto."); }
+          setProcessando(false);
+          e.target.value='';
+        }}/>
+    </div>
+  );
+}
+
+/* ---------- tela: configuração pendente ---------- */
+function ConfigNeeded(){
+  return (
+    <div className="center-screen">
+      <div className="config-card">
+        <h2 style={{marginTop:0}}>Configuração pendente</h2>
+        <p style={{fontSize:13.5,color:'var(--texto-suave)'}}>Este app ainda não está conectado à planilha do Google Sheets.</p>
+        <ol>
+          <li>Publique o <code>Code.gs</code> como App da Web no Apps Script da sua planilha (execução como você, acesso "Qualquer pessoa").</li>
+          <li>Copie a URL gerada (termina em <code>/exec</code>).</li>
+          <li>Neste arquivo HTML, no início da tag <code>&lt;script&gt;</code>, cole a URL em <code>CONFIG.API_URL</code>.</li>
+          <li>Salve e reabra o arquivo (ou reenvie ao GitHub Pages).</li>
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- tela: erro de conexão ---------- */
+function ErroConexao({mensagem, onTentar}){
+  return (
+    <div className="center-screen">
+      <div className="config-card">
+        <h2 style={{marginTop:0}}>Não foi possível conectar</h2>
+        <div className="banner-error" style={{marginBottom:16}}><IconAlert size={16}/><span>{mensagem}</span></div>
+        <p style={{fontSize:13,color:'var(--texto-suave)'}}>Verifique sua internet e se a implantação do Apps Script ainda está ativa.</p>
+        <button className="btn btn-primary" onClick={onTentar}><IconRefresh size={15}/> Tentar novamente</button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- tela de escolha de acesso (sem senha, por enquanto) ---------- */
+function AccessScreen({onEnter}){
+  const [tipo,setTipo]=useState(null);
+  const [nome,setNome]=useState("");
+  const [erro,setErro]=useState("");
+
+  const confirmarMotorista=()=>{
+    if(!nome.trim()) return setErro("Informe seu nome para continuar.");
+    setErro(""); onEnter({nome:nome.trim(), tipo:"motorista"});
+  };
+
+  return (
+    <div className="login-wrap">
+      <div className="login-card">
+        <div className="login-left">
+          <div>
+            <div className="login-badge"><IconGauge size={13}/> Secretaria de Educação</div>
+            <h1 style={{fontSize:26,margin:'14px 0 4px'}}>RotaFrota</h1>
+            <p style={{fontSize:13,color:'#cfe0ea',margin:0}}>Controle de utilização dos veículos: agendamento, trajeto e quilometragem em um só lugar.</p>
+            <div className="login-icongrid">
+              <div><IconCar size={20}/></div><div><IconMap size={20}/></div><div><IconPin size={20}/></div><div><IconGauge size={20}/></div>
+            </div>
+          </div>
+          <div className="roadline"></div>
+        </div>
+        <div className="login-right">
+          <h2 style={{fontSize:18,marginTop:0}}>Como você vai acessar?</h2>
+          <p style={{fontSize:12.5,color:'var(--texto-suave)',marginTop:-8,marginBottom:18}}>Escolha o tipo de acesso para continuar.</p>
+
+          <div className="flexwrap" style={{marginBottom:16}}>
+            <button type="button" className={"access-card"+(tipo==="motorista"?" active":"")} onClick={()=>{setTipo("motorista"); setErro("");}}>
+              <div className="vic" style={{background:'var(--azul-estrada)'}}><IconCar size={20}/></div>
+              <div><div style={{fontWeight:700,fontSize:14}}>Motorista</div><div style={{fontSize:11.5,color:'var(--texto-suave)'}}>Registrar uma viagem</div></div>
+            </button>
+            <button type="button" className={"access-card"+(tipo==="admin"?" active":"")} onClick={()=>{setTipo("admin"); setErro("");}}>
+              <div className="vic" style={{background:'var(--linha-escura)'}}><IconGrid size={20}/></div>
+              <div><div style={{fontWeight:700,fontSize:14}}>Administrador</div><div style={{fontSize:11.5,color:'var(--texto-suave)'}}>Gerenciar a frota</div></div>
+            </button>
+          </div>
+
+          {tipo==="motorista" && (
+            <div className="field">
+              <label>Seu nome</label>
+              <input type="text" value={nome} onChange={e=>setNome(e.target.value)} placeholder="Nome completo" autoFocus/>
+            </div>
+          )}
+
+          {erro && <div className="banner-error" style={{marginBottom:14}}><IconAlert size={15}/><span>{erro}</span></div>}
+
+          {tipo==="motorista" && <button className="btn btn-accent btn-block" onClick={confirmarMotorista}><IconPlay size={16}/> Continuar</button>}
+          {tipo==="admin" && <button className="btn btn-accent btn-block" onClick={()=>onEnter({nome:"Administrador", tipo:"admin"})}><IconGrid size={16}/> Entrar no painel</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- app principal ---------- */
+function App(){
+  const [user,setUser] = useState(null);
+  const [collapsed,setCollapsed] = useState(false);
+  const [mobileOpen,setMobileOpen] = useState(false);
+  const [page,setPage] = useState("nova-viagem");
+  const [veiculos,setVeiculos] = useState([]);
+  const [viagens,setViagens] = useState([]);
+  const [detalheViagem,setDetalheViagem] = useState(null);
+  const [carregando,setCarregando] = useState(true);
+  const [erroApi,setErroApi] = useState("");
+
+  const carregarDados = async () => {
+    setCarregando(true); setErroApi("");
+    try{
+      const [veic, viag] = await Promise.all([apiGet('veiculos'), apiGet('viagens')]);
+      setVeiculos(Array.isArray(veic)?veic:[]);
+      setViagens(Array.isArray(viag)?viag:[]);
+    }catch(err){ setErroApi(err.message || String(err)); }
+    setCarregando(false);
+  };
+
+  useEffect(()=>{ carregarDados(); },[]);
+  useEffect(()=>{ if(user) setPage(user.tipo==="motorista" ? "nova-viagem" : "painel"); }, [user && user.id, user && user.nome]);
+
+  if(erroApi) return <ErroConexao mensagem={erroApi} onTentar={carregarDados}/>;
+  if(!user) return <AccessScreen onEnter={setUser}/>;
+
+  const sair = () => { setUser(null); setMobileOpen(false); };
+  const veiculoDisponivel = (v) => !viagens.some(vg=>vg.veiculoId===v.id && vg.status==="em_andamento");
+  const viagemAtiva = viagens.find(v=>v.motorista===user.nome && v.status==="em_andamento") || null;
+  const minhasViagens = viagens.filter(v=>v.motorista===user.nome);
+
+  const iniciarViagem = async (dados) => {
+    const resp = await apiPost('iniciarViagem', {
+      motorista:user.nome, veiculoId:dados.veiculoId, finalidade:dados.finalidade,
+      kmInicial:Number(dados.kmInicial), fotoInicialBase64:dados.fotoInicial
+    });
+    setViagens(prev=>[resp, ...prev]);
+  };
+
+  const finalizarViagemChamada = async (viagemId, kmFinal, fotoFinalBase64) => {
+    const resp = await apiPost('finalizarViagem', {viagemId, kmFinal:Number(kmFinal), fotoFinalBase64});
+    setViagens(prev=>prev.map(v=> v.id===viagemId ? {...v, kmFinal:Number(kmFinal), fotoFinalUrl:resp.fotoFinalUrl, fim:resp.fim, status:'concluida'} : v));
+  };
+
+  const criarVeiculoChamada = async (dados) => {
+    const resp = await apiPost('criarVeiculo', dados);
+    setVeiculos(prev=>[...prev, resp]);
+  };
+  const removerVeiculoChamada = async (id) => {
+    await apiPost('removerVeiculo', {id});
+    setVeiculos(prev=>prev.filter(v=>v.id!==id));
+  };
+
+  const NAV_MOTORISTA = [
+    {id:"nova-viagem", label:"Viagem", icon:IconPlay},
+    {id:"minhas-viagens", label:"Minhas viagens", icon:IconClip},
+  ];
+  const NAV_ADMIN = [
+    {id:"painel", label:"Painel", icon:IconGrid},
+    {id:"veiculos", label:"Veículos", icon:IconTruck},
+    {id:"viagens", label:"Viagens", icon:IconMap},
+    {id:"relatorios", label:"Relatórios", icon:IconBar},
+  ];
+  const nav = user.tipo==="motorista" ? NAV_MOTORISTA : NAV_ADMIN;
+
+  return (
+    <div className="app">
+      <div className={"sidebar"+(collapsed?" collapsed":"")} style={mobileOpen?{position:'fixed',zIndex:40,height:'100vh'}:{}}>
+        <div className="sidebar-head">
+          <div className="logo-mark"><IconGauge size={19} color="#22262b"/></div>
+          <div className="logo-text">RotaFrota<small>Controle de Veículos · SEME</small></div>
+        </div>
+        <div className="nav">
+          {nav.map(item=>{
+            const Ic=item.icon;
+            return <button key={item.id} className={"nav-item"+(page===item.id?" active":"")} onClick={()=>{setPage(item.id); setMobileOpen(false);}}>
+              <Ic size={17}/><span className="nav-label">{item.label}</span>
+            </button>;
+          })}
+        </div>
+        <div className="user-box">
+          <div className="avatar">{initials(user.nome)}</div>
+          <div className="who">
+            <div className="n">{user.nome}</div>
+            <div className="t">{user.tipo==="motorista"?"Motorista":"Administrador"}</div>
+          </div>
+        </div>
+        <button className="logout-btn" onClick={sair}><IconLogout size={15}/><span>Trocar acesso</span></button>
+        <div className="sidebar-foot">Conectado à planilha · dados salvos no Sheets</div>
+      </div>
+
+      <div className="main">
+        <div className="topbar">
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <button className="burger" onClick={()=>{ if(window.innerWidth<820){setMobileOpen(o=>!o);} else {setCollapsed(c=>!c);} }}><IconMenu/></button>
+            <div className="top-title">{user.tipo==="motorista" ? "Acesso do Motorista" : "Painel Administrativo"}</div>
+          </div>
+          <div className="top-right"><IconUser size={15}/> {user.nome.split(" ")[0]}</div>
+        </div>
+
+        <div className="content">
+          {carregando ? (
+            <div className="card" style={{display:'flex',alignItems:'center',gap:10,maxWidth:320}}>
+              <span className="spinner spinner-dark"></span><span style={{fontSize:13.5,color:'var(--texto-suave)'}}>Carregando dados da planilha…</span>
+            </div>
+          ) : (
+            <React.Fragment>
+              {user.tipo==="motorista" && page==="nova-viagem" && (
+                viagemAtiva
+                  ? <ViagemAndamento viagem={viagemAtiva} veiculos={veiculos} onFinalizar={finalizarViagemChamada}/>
+                  : <NovaViagem user={user} veiculos={veiculos} veiculoDisponivel={veiculoDisponivel} onIniciar={iniciarViagem}/>
+              )}
+              {user.tipo==="motorista" && page==="minhas-viagens" && (
+                <MinhasViagens viagens={minhasViagens} veiculos={veiculos} onAbrir={setDetalheViagem}/>
+              )}
+              {user.tipo==="admin" && page==="painel" && <PainelAdmin viagens={viagens} veiculos={veiculos}/>}
+              {user.tipo==="admin" && page==="veiculos" && <VeiculosAdmin veiculos={veiculos} veiculoDisponivel={veiculoDisponivel} onCriar={criarVeiculoChamada} onRemover={removerVeiculoChamada}/>}
+              {user.tipo==="admin" && page==="viagens" && <ViagensAdmin viagens={viagens} veiculos={veiculos} onAbrir={setDetalheViagem}/>}
+              {user.tipo==="admin" && page==="relatorios" && <RelatoriosAdmin viagens={viagens} veiculos={veiculos}/>}
+            </React.Fragment>
+          )}
+        </div>
+      </div>
+
+      {detalheViagem && <DetalheModal viagem={detalheViagem} veiculos={veiculos} onClose={()=>setDetalheViagem(null)}/>}
+    </div>
+  );
+}
+
+/* ---------- Motorista: nova viagem ---------- */
+function NovaViagem({user, veiculos, veiculoDisponivel, onIniciar}){
+  const [veiculoId,setVeiculoId]=useState("");
+  const [finalidade,setFinalidade]=useState("");
+  const [kmInicial,setKmInicial]=useState("");
+  const [fotoInicial,setFotoInicial]=useState(null);
+  const [erro,setErro]=useState("");
+  const [salvando,setSalvando]=useState(false);
+
+  const passo1ok = !!veiculoId;
+  const passo2ok = kmInicial!=="" && Number(kmInicial)>=0 && !!fotoInicial;
+
+  const submeter=async ()=>{
+    if(!veiculoId) return setErro("Selecione o veículo.");
+    if(kmInicial==="" || Number(kmInicial)<0) return setErro("Informe a quilometragem inicial.");
+    if(!fotoInicial) return setErro("A foto do painel de KM é obrigatória.");
+    setErro(""); setSalvando(true);
+    try{ await onIniciar({veiculoId, kmInicial, finalidade, fotoInicial}); }
+    catch(err){ setErro("Não foi possível iniciar a viagem: "+(err.message||err)); }
+    setSalvando(false);
+  };
+
+  const veiculoSel = veiculos.find(v=>v.id===veiculoId);
+
+  return (
+    <div>
+      <div className="page-head">
+        <div className="badge"><IconPlay size={18} color="#fff"/></div>
+        <div><h1>Iniciar viagem</h1><p>Olá, {user.nome.split(" ")[0]} — preencha antes de sair</p></div>
+      </div>
+
+      <div className="stepper">
+        <div className={"step "+(passo1ok?"done":"active")}><div className="dot">{passo1ok?<IconCheck size={13}/>:"1"}</div><span className="txt">Veículo</span></div>
+        <div className={"line"+(passo1ok?" done":"")}></div>
+        <div className={"step "+(passo2ok?"done":(passo1ok?"active":""))}><div className="dot">{passo2ok?<IconCheck size={13}/>:"2"}</div><span className="txt">KM + foto</span></div>
+        <div className={"line"+(passo2ok?" done":"")}></div>
+        <div className={"step "+(passo2ok?"active":"")}><div className="dot">3</div><span className="txt">Iniciar</span></div>
+      </div>
+
+      <div className="card" style={{maxWidth:520}}>
+        <div className="section-block">
+          <h3><IconCar size={15}/> Veículo e destino</h3>
+          <div className="field">
+            <label>Placa do veículo</label>
+            <select value={veiculoId} onChange={e=>setVeiculoId(e.target.value)}>
+              <option value="">Selecione</option>
+              {veiculos.map(v=>{
+                const disp = veiculoDisponivel(v);
+                return <option key={v.id} value={v.id} disabled={!disp}>{v.placa} · {v.modelo} {disp?"":"(em uso)"}</option>;
+              })}
+            </select>
+          </div>
+          {veiculoSel && (
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+              <div className="vic" style={{background:TIPO_COR[veiculoSel.tipo]||'#2f6690'}}><IconCar size={19}/></div>
+              <div style={{fontSize:12.5,color:'var(--texto-suave)'}}>{veiculoSel.tipo} selecionado</div>
+            </div>
+          )}
+          <div className="field" style={{marginBottom:0}}>
+            <label>Finalidade / destino (opcional)</label>
+            <input type="text" placeholder="Ex: Entrega de documentos na EMEIEF..." value={finalidade} onChange={e=>setFinalidade(e.target.value)}/>
+          </div>
+        </div>
+
+        <div className="section-block accent">
+          <h3><IconGauge size={15}/> Quilometragem inicial</h3>
+          <div className="field">
+            <label>KM do painel ao sair</label>
+            <input type="number" inputMode="numeric" placeholder="Ex: 48210" value={kmInicial} onChange={e=>setKmInicial(e.target.value)}/>
+          </div>
+          {kmInicial!=="" && (
+            <CameraCapture label="Foto do painel de KM (inicial)" value={fotoInicial} onChange={setFotoInicial} required/>
+          )}
+        </div>
+
+        {erro && <div className="banner-error" style={{marginBottom:14}}><IconAlert size={15}/><span>{erro}</span></div>}
+
+        <div className="banner-warn" style={{marginBottom:16}}>
+          <IconPin size={15}/>
+          <span>Ao iniciar, sua localização será registrada periodicamente durante a viagem, para compor o trajeto percorrido com o veículo.</span>
+        </div>
+
+        <div className="sticky-actions">
+          <button className="btn btn-accent btn-block" disabled={!passo2ok || salvando} onClick={submeter}>
+            {salvando ? <span className="spinner spinner-dark"></span> : <IconPlay size={16}/>} {salvando ? "Salvando…" : "Iniciar viagem e rastreamento"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Motorista: viagem em andamento ---------- */
+function ViagemAndamento({viagem, veiculos, onFinalizar}){
+  const veiculo = veiculos.find(v=>v.id===viagem.veiculoId);
+  const [agora,setAgora]=useState(Date.now());
+  const [statusGps,setStatusGps]=useState("aguardando");
+  const [pontos,setPontos]=useState([]);
+  const [kmFinal,setKmFinal]=useState("");
+  const [fotoFinal,setFotoFinal]=useState(null);
+  const [mostrarFinalizar,setMostrarFinalizar]=useState(false);
+  const [erro,setErro]=useState("");
+  const [salvando,setSalvando]=useState(false);
+  const watchIdRef = useRef(null);
+  const bufferRef = useRef([]);
+
+  useEffect(()=>{ const t=setInterval(()=>setAgora(Date.now()),1000); return ()=>clearInterval(t); },[]);
+
+  const registrarPonto = (pos, origem) => {
+    const ponto = {lat:pos.coords.latitude, lng:pos.coords.longitude, t:Date.now(), acc:pos.coords.accuracy, origem};
+    setPontos(prev=>[...prev, ponto]);
+    bufferRef.current.push(ponto);
+  };
+
+  useEffect(()=>{
+    if(!navigator.geolocation){ setStatusGps("indisponivel"); return; }
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos)=>{ setStatusGps("ativo"); registrarPonto(pos,"contínuo"); },
+      (err)=>{ setStatusGps(err.code===1 ? "negado" : "indisponivel"); },
+      {enableHighAccuracy:true, maximumAge:4000, timeout:15000}
+    );
+    const onVisible = () => {
+      if(document.visibilityState==="visible" && navigator.geolocation){
+        navigator.geolocation.getCurrentPosition((pos)=>registrarPonto(pos,"retorno ao app"), ()=>{}, {enableHighAccuracy:true});
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return ()=>{ if(watchIdRef.current!==null) navigator.geolocation.clearWatch(watchIdRef.current); document.removeEventListener("visibilitychange", onVisible); };
+  },[viagem.id]);
+
+  // envia os pontos acumulados para a planilha a cada 15s, em lote
+  useEffect(()=>{
+    const flush = async () => {
+      if(bufferRef.current.length===0) return;
+      const lote = bufferRef.current; bufferRef.current=[];
+      try{ await apiPost('adicionarPontos', {viagemId:viagem.id, pontos:lote}); }
+      catch(err){ bufferRef.current = lote.concat(bufferRef.current); }
+    };
+    const t = setInterval(flush, 15000);
+    return ()=>{ clearInterval(t); flush(); };
+  },[viagem.id]);
+
+  const checkpointManual = () => {
+    if(!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos)=>registrarPonto(pos,"manual"), ()=>setErro("Não foi possível obter sua localização agora."), {enableHighAccuracy:true});
+  };
+
+  const distancia = distanciaTotal(pontos);
+  const duracao = agora - viagem.inicio;
+
+  const confirmarFinal = async () => {
+    if(kmFinal==="" || Number(kmFinal) < Number(viagem.kmInicial)) return setErro("A quilometragem final deve ser maior ou igual à inicial ("+viagem.kmInicial+").");
+    if(!fotoFinal) return setErro("A foto do painel de KM final é obrigatória.");
+    setErro(""); setSalvando(true);
+    try{
+      if(watchIdRef.current!==null) navigator.geolocation.clearWatch(watchIdRef.current);
+      if(bufferRef.current.length){ await apiPost('adicionarPontos', {viagemId:viagem.id, pontos:bufferRef.current}); bufferRef.current=[]; }
+      await onFinalizar(viagem.id, kmFinal, fotoFinal);
+    }catch(err){ setErro("Não foi possível salvar: "+(err.message||err)); }
+    setSalvando(false);
+  };
+
+  return (
+    <div>
+      <div className="page-head">
+        <div className="badge" style={{background:'var(--verde)'}}><IconMap size={18} color="#fff"/></div>
+        <div><h1>Viagem em andamento</h1><p>{veiculo?.placa} · {veiculo?.modelo}</p></div>
+      </div>
+
+      <div className="grid grid-3" style={{marginBottom:14}}>
+        <div className="stat" style={{'--accent':'var(--verde)'}}>
+          <div className="label">Tempo</div>
+          <div className="value mono">{fmtDur(duracao)}</div>
+        </div>
+        <div className="stat" style={{'--accent':'var(--azul-estrada)'}}>
+          <div className="label">Distância</div>
+          <div className="value mono">{kmFmt(distancia)}</div>
+        </div>
+        <div className="stat" style={{'--accent':'var(--linha-escura)'}}>
+          <div className="label">Pontos GPS</div>
+          <div className="value mono">{pontos.length}</div>
+        </div>
+      </div>
+
+      <div className="card" style={{marginBottom:14}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,flexWrap:'wrap',gap:8}}>
+          <h3 style={{margin:0,fontSize:14}}>Trajeto ao vivo</h3>
+          <span className={"pill "+(statusGps==="ativo"?"pill-andamento":"pill-uso")}>
+            {statusGps==="ativo" && "GPS ativo"}
+            {statusGps==="aguardando" && "Conectando ao GPS…"}
+            {statusGps==="negado" && "Localização negada"}
+            {statusGps==="indisponivel" && "GPS indisponível"}
+          </span>
+        </div>
+        <RouteSVG pontos={pontos}/>
+        {statusGps==="negado" && <div className="banner-warn" style={{marginTop:12}}><IconAlert size={15}/><span>A permissão de localização foi negada. A viagem continua, mas o trajeto não será registrado — só a quilometragem informada.</span></div>}
+        <div style={{marginTop:12}}>
+          <button className="btn btn-ghost" onClick={checkpointManual}><IconPin size={15}/> Registrar minha localização agora</button>
+        </div>
+        <p style={{fontSize:11.5,color:'var(--texto-suave)',marginTop:10,marginBottom:0}}>O rastreamento roda enquanto este app estiver na tela, e os pontos são enviados à planilha a cada 15 segundos. Se a tela travar ou trocar de app, o registro pausa e retoma sozinho ao voltar aqui.</p>
+      </div>
+
+      {erro && <div className="banner-error" style={{marginBottom:14}}><IconAlert size={15}/><span>{erro}</span></div>}
+
+      {!mostrarFinalizar ? (
+        <div className="sticky-actions">
+          <button className="btn btn-primary btn-block" onClick={()=>setMostrarFinalizar(true)}><IconFlag size={16}/> Finalizar viagem</button>
+        </div>
+      ) : (
+        <div className="card">
+          <h3 style={{marginTop:0,fontSize:14}}>Encerrar viagem</h3>
+          <div className="section-block ok" style={{marginBottom:12}}>
+            <div className="field">
+              <label>KM do painel ao chegar</label>
+              <input type="number" inputMode="numeric" placeholder={"Maior ou igual a "+viagem.kmInicial} value={kmFinal} onChange={e=>setKmFinal(e.target.value)}/>
+            </div>
+            {kmFinal!=="" && <CameraCapture label="Foto do painel de KM (final)" value={fotoFinal} onChange={setFotoFinal} required/>}
+          </div>
+          <div className="sticky-actions" style={{padding:'8px 0 0'}}>
+            <div className="flexwrap">
+              <button className="btn btn-accent" style={{flex:1}} disabled={salvando} onClick={confirmarFinal}>
+                {salvando ? <span className="spinner spinner-dark"></span> : <IconCheck size={15}/>} {salvando ? "Salvando…" : "Confirmar e encerrar"}
+              </button>
+              <button className="btn btn-ghost" disabled={salvando} onClick={()=>setMostrarFinalizar(false)}>Voltar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Motorista: minhas viagens ---------- */
+function MinhasViagens({viagens, veiculos, onAbrir}){
+  return (
+    <div>
+      <div className="page-head">
+        <div className="badge"><IconClip size={18} color="#fff"/></div>
+        <div><h1>Minhas viagens</h1><p>Seu histórico de uso de veículos</p></div>
+      </div>
+      <div className="card">
+        {viagens.length===0 ? <p style={{color:'var(--texto-suave)',fontSize:13.5}}>Nenhuma viagem registrada ainda.</p> : (
+        <div className="tablewrap">
+          <table>
+            <thead><tr><th>Veículo</th><th>Início</th><th>KM inicial</th><th>KM final</th><th>Rodado</th><th>Status</th></tr></thead>
+            <tbody>
+              {viagens.map(v=>{
+                const veic = veiculos.find(x=>x.id===v.veiculoId);
+                return (
+                  <tr key={v.id} className="rowlink" onClick={()=>onAbrir(v)}>
+                    <td>{veic?.placa}</td>
+                    <td>{fmtDate(v.inicio)}</td>
+                    <td className="mono">{v.kmInicial}</td>
+                    <td className="mono">{v.kmFinal ?? "—"}</td>
+                    <td className="mono">{v.kmFinal ? (v.kmFinal-v.kmInicial)+" km" : "—"}</td>
+                    <td><span className={"pill "+(v.status==="em_andamento"?"pill-andamento":"pill-concluida")}>{v.status==="em_andamento"?"Em andamento":"Concluída"}</span></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Admin: painel ---------- */
+function PainelAdmin({viagens, veiculos}){
+  const emUso = viagens.filter(v=>v.status==="em_andamento").length;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const viagensHoje = viagens.filter(v=>v.inicio>=hoje.getTime()).length;
+  const kmTotal = viagens.filter(v=>v.kmFinal).reduce((s,v)=>s+(v.kmFinal-v.kmInicial),0);
+  return (
+    <div>
+      <div className="page-head">
+        <div className="badge"><IconGrid size={18} color="#fff"/></div>
+        <div><h1>Painel</h1><p>Visão geral da frota da secretaria</p></div>
+      </div>
+      <div className="grid grid-4">
+        <div className="stat" style={{'--accent':'var(--azul-estrada)'}}><div className="label">Veículos</div><div className="value">{veiculos.length}</div></div>
+        <div className="stat" style={{'--accent':'var(--linha-escura)'}}><div className="label">Em uso agora</div><div className="value">{emUso}</div></div>
+        <div className="stat" style={{'--accent':'var(--verde)'}}><div className="label">Viagens hoje</div><div className="value">{viagensHoje}</div></div>
+        <div className="stat" style={{'--accent':'var(--vermelho)'}}><div className="label">Km total</div><div className="value">{kmTotal}</div></div>
+      </div>
+
+      <div className="card" style={{marginTop:16}}>
+        <h3 style={{marginTop:0,fontSize:14}}>Status atual da frota</h3>
+        <div className="tablewrap">
+          <table>
+            <thead><tr><th>Placa</th><th>Modelo</th><th>Status</th></tr></thead>
+            <tbody>
+              {veiculos.map(v=>{
+                const ativa = viagens.find(vg=>vg.veiculoId===v.id && vg.status==="em_andamento");
+                return <tr key={v.id}>
+                  <td className="mono">{v.placa}</td><td>{v.modelo}</td>
+                  <td>{ativa ? <span className="pill pill-uso">Em uso — {ativa.motorista}</span> : <span className="pill pill-disponivel">Disponível</span>}</td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Admin: veículos ---------- */
+function VeiculosAdmin({veiculos, veiculoDisponivel, onCriar, onRemover}){
+  const [placa,setPlaca]=useState(""); const [modelo,setModelo]=useState(""); const [tipo,setTipo]=useState("Passeio");
+  const [salvando,setSalvando]=useState(false);
+  const [erro,setErro]=useState("");
+
+  const adicionar=async ()=>{
+    if(!placa.trim()||!modelo.trim()) return setErro("Preencha placa e modelo.");
+    setErro(""); setSalvando(true);
+    try{ await onCriar({placa:placa.toUpperCase(), modelo, tipo}); setPlaca(""); setModelo(""); }
+    catch(err){ setErro("Não foi possível salvar: "+(err.message||err)); }
+    setSalvando(false);
+  };
+  const remover=async (id)=>{
+    if(!confirm("Remover este veículo?")) return;
+    try{ await onRemover(id); } catch(err){ alert("Não foi possível remover: "+(err.message||err)); }
+  };
+
+  return (
+    <div>
+      <div className="page-head"><div className="badge"><IconTruck size={18} color="#fff"/></div><div><h1>Veículos</h1><p>Cadastro da frota da secretaria</p></div></div>
+      <div className="card" style={{marginBottom:16,maxWidth:520}}>
+        <h3 style={{marginTop:0,fontSize:14}}>Novo veículo</h3>
+        <div className="field"><label>Placa</label><input value={placa} onChange={e=>setPlaca(e.target.value)} placeholder="Ex: ABC-1D23"/></div>
+        <div className="field"><label>Modelo</label><input value={modelo} onChange={e=>setModelo(e.target.value)} placeholder="Ex: Fiat Strada"/></div>
+        <div className="field" style={{marginBottom:0}}><label>Tipo</label>
+          <select value={tipo} onChange={e=>setTipo(e.target.value)}>
+            <option>Passeio</option><option>Utilitário</option><option>Van</option><option>Ônibus</option><option>Caminhão</option>
+          </select>
+        </div>
+        {erro && <div className="banner-error" style={{marginTop:12}}><IconAlert size={15}/><span>{erro}</span></div>}
+        <button className="btn btn-primary" style={{marginTop:14}} disabled={salvando} onClick={adicionar}>
+          {salvando ? <span className="spinner"></span> : null} {salvando ? "Salvando…" : "Adicionar veículo"}
+        </button>
+      </div>
+      <div className="card">
+        <div className="tablewrap">
+          <table>
+            <thead><tr><th>Placa</th><th>Modelo</th><th>Tipo</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              {veiculos.map(v=>(
+                <tr key={v.id}>
+                  <td className="mono">{v.placa}</td><td>{v.modelo}</td>
+                  <td><span style={{display:'inline-flex',alignItems:'center',gap:6}}><span style={{width:9,height:9,borderRadius:99,background:TIPO_COR[v.tipo]||'#2f6690',display:'inline-block'}}></span>{v.tipo}</span></td>
+                  <td>{veiculoDisponivel(v) ? <span className="pill pill-disponivel">Disponível</span> : <span className="pill pill-uso">Em uso</span>}</td>
+                  <td><button className="btn btn-danger" style={{padding:'6px 10px',minHeight:'auto'}} onClick={()=>remover(v.id)}><IconX size={14}/></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Admin: viagens ---------- */
+function ViagensAdmin({viagens, veiculos, onAbrir}){
+  const [fVeiculo,setFVeiculo]=useState(""); const [fStatus,setFStatus]=useState("");
+  const filtradas = viagens.filter(v=> (!fVeiculo||v.veiculoId===fVeiculo) && (!fStatus||v.status===fStatus) );
+  return (
+    <div>
+      <div className="page-head"><div className="badge"><IconMap size={18} color="#fff"/></div><div><h1>Viagens</h1><p>Todas as viagens registradas pela frota</p></div></div>
+      <div className="card" style={{marginBottom:16}}>
+        <div className="flexwrap">
+          <select style={{width:220}} value={fVeiculo} onChange={e=>setFVeiculo(e.target.value)}>
+            <option value="">Todos os veículos</option>
+            {veiculos.map(v=><option key={v.id} value={v.id}>{v.placa}</option>)}
+          </select>
+          <select style={{width:200}} value={fStatus} onChange={e=>setFStatus(e.target.value)}>
+            <option value="">Todos os status</option>
+            <option value="em_andamento">Em andamento</option>
+            <option value="concluida">Concluída</option>
+          </select>
+        </div>
+      </div>
+      <div className="card">
+        {filtradas.length===0 ? <p style={{color:'var(--texto-suave)',fontSize:13.5}}>Nenhuma viagem encontrada.</p> : (
+        <div className="tablewrap">
+          <table>
+            <thead><tr><th>Motorista</th><th>Veículo</th><th>Início</th><th>KM inicial</th><th>KM final</th><th>Rodado</th><th>Status</th></tr></thead>
+            <tbody>
+              {filtradas.map(v=>{
+                const veic = veiculos.find(x=>x.id===v.veiculoId);
+                return (
+                  <tr key={v.id} className="rowlink" onClick={()=>onAbrir(v)}>
+                    <td>{v.motorista}</td><td className="mono">{veic?.placa}</td><td>{fmtDate(v.inicio)}</td>
+                    <td className="mono">{v.kmInicial}</td><td className="mono">{v.kmFinal ?? "—"}</td>
+                    <td className="mono">{v.kmFinal ? (v.kmFinal-v.kmInicial)+" km" : "—"}</td>
+                    <td><span className={"pill "+(v.status==="em_andamento"?"pill-andamento":"pill-concluida")}>{v.status==="em_andamento"?"Em andamento":"Concluída"}</span></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Admin: relatórios ---------- */
+function RelatoriosAdmin({viagens, veiculos}){
+  const concluidas = viagens.filter(v=>v.status==="concluida");
+  const porVeiculo = veiculos.map(v=>{
+    const km = concluidas.filter(vg=>vg.veiculoId===v.id).reduce((s,vg)=>s+(vg.kmFinal-vg.kmInicial),0);
+    return {placa:v.placa, km};
+  });
+  const maxKm = Math.max(1, ...porVeiculo.map(p=>p.km));
+
+  const exportarCSV = () => {
+    const header = "Motorista,Placa,Inicio,Fim,KM Inicial,KM Final,KM Rodado\n";
+    const rows = concluidas.map(v=>{
+      const veic=veiculos.find(x=>x.id===v.veiculoId);
+      return [v.motorista, veic?.placa, new Date(v.inicio).toISOString(), new Date(v.fim).toISOString(), v.kmInicial, v.kmFinal, v.kmFinal-v.kmInicial].join(",");
+    }).join("\n");
+    const blob = new Blob([header+rows], {type:"text/csv;charset=utf-8;"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.download="viagens_frota.csv"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div>
+      <div className="page-head"><div className="badge"><IconBar size={18} color="#fff"/></div><div><h1>Relatórios</h1><p>Quilometragem rodada por veículo</p></div></div>
+      <div className="card" style={{marginBottom:16}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:10}}>
+          <h3 style={{margin:0,fontSize:14}}>Km rodado por veículo</h3>
+          <button className="btn btn-ghost" onClick={exportarCSV}>Exportar CSV</button>
+        </div>
+        {porVeiculo.map(p=>(
+          <div key={p.placa} style={{marginBottom:12}}>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}>
+              <span className="mono">{p.placa}</span><span className="mono">{p.km} km</span>
+            </div>
+            <div style={{height:10,background:'#eef1f3',borderRadius:6,overflow:'hidden'}}>
+              <div style={{height:'100%',width:(p.km/maxKm*100)+'%',background:'linear-gradient(90deg,var(--azul-estrada),var(--linha))'}}></div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="odo">
+        <div className="odo-label">Total geral rodado</div>
+        <div className="digits">{String(concluidas.reduce((s,v)=>s+(v.kmFinal-v.kmInicial),0)).padStart(6,'0')} KM</div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- modal de detalhe (busca os pontos de GPS na hora) ---------- */
+function DetalheModal({viagem, veiculos, onClose}){
+  const veic = veiculos.find(v=>v.id===viagem.veiculoId);
+  const [pontos,setPontos]=useState(null);
+
+  useEffect(()=>{
+    let ativo=true;
+    apiGet('pontos', {viagemId:viagem.id}).then(r=>{ if(ativo) setPontos(Array.isArray(r)?r:[]); }).catch(()=>{ if(ativo) setPontos([]); });
+    return ()=>{ativo=false;};
+  },[viagem.id]);
+
+  const distancia = distanciaTotal(pontos||[]);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{position:'relative'}} onClick={e=>e.stopPropagation()}>
+        <button className="btn btn-ghost modal-close" style={{padding:'6px 9px',minHeight:'auto'}} onClick={onClose}><IconX size={15}/></button>
+        <h2 style={{marginTop:0,fontSize:18}}>{veic?.placa} · {veic?.modelo}</h2>
+        <p style={{color:'var(--texto-suave)',fontSize:13,marginTop:-6}}>Motorista: {viagem.motorista} {viagem.finalidade ? "· "+viagem.finalidade : ""}</p>
+        <div className="grid grid-3" style={{marginBottom:16}}>
+          <div className="stat" style={{'--accent':'var(--azul-estrada)'}}><div className="label">KM inicial</div><div className="value mono">{viagem.kmInicial}</div></div>
+          <div className="stat" style={{'--accent':'var(--linha-escura)'}}><div className="label">KM final</div><div className="value mono">{viagem.kmFinal ?? "—"}</div></div>
+          <div className="stat" style={{'--accent':'var(--verde)'}}><div className="label">Km rodado</div><div className="value mono">{viagem.kmFinal ? (viagem.kmFinal-viagem.kmInicial) : "—"}</div></div>
+        </div>
+        <p style={{fontSize:12,color:'var(--texto-suave)'}}>Início: {fmtDate(viagem.inicio)} {viagem.fim ? "· Fim: "+fmtDate(viagem.fim) : ""} {pontos ? "· Distância via GPS: "+kmFmt(distancia)+" · "+pontos.length+" pontos registrados" : ""}</p>
+        {pontos===null ? (
+          <div className="route-box" style={{height:200,display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <span className="spinner"></span>
+          </div>
+        ) : <RouteSVG pontos={pontos} height={240}/>}
+        {(viagem.fotoInicialUrl || viagem.fotoFinalUrl) && (
+          <div className="grid" style={{gridTemplateColumns:'1fr 1fr',marginTop:16}}>
+            <div>
+              <label>Foto KM inicial</label>
+              {viagem.fotoInicialUrl ? <a href={viagem.fotoInicialUrl} target="_blank" rel="noreferrer"><img src={viagem.fotoInicialUrl} style={{borderRadius:10,border:'1px solid var(--borda)'}}/></a> : <p style={{fontSize:12,color:'var(--texto-suave)'}}>—</p>}
+            </div>
+            <div>
+              <label>Foto KM final</label>
+              {viagem.fotoFinalUrl ? <a href={viagem.fotoFinalUrl} target="_blank" rel="noreferrer"><img src={viagem.fotoFinalUrl} style={{borderRadius:10,border:'1px solid var(--borda)'}}/></a> : <p style={{fontSize:12,color:'var(--texto-suave)'}}>—</p>}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const isConfigPending = CONFIG.API_URL.indexOf("COLE_AQUI") > -1;
+ReactDOM.createRoot(document.getElementById('root')).render(isConfigPending ? <ConfigNeeded/> : <App/>);
+</script>
+</body>
+</html>
