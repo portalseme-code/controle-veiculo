@@ -6,6 +6,8 @@
 <title>RotaFrota — Controle de Veículos SEME</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
@@ -92,7 +94,10 @@
   .burger{background:none;border:none;color:#cfd4da;padding:6px;border-radius:6px;display:flex;}
   .burger:hover{background:rgba(255,255,255,0.08);}
   .top-title{color:#fff;font-weight:600;font-size:14.5px;}
-  .top-right{display:flex;align-items:center;gap:10px;color:#cfd4da;font-size:12.5px;}
+  .top-right{display:flex;align-items:center;gap:14px;color:#cfd4da;font-size:12.5px;}
+  .topbar-logout{display:flex;align-items:center;gap:6px;background:none;border:1px solid rgba(255,255,255,0.16);color:#cfd4da;padding:6px 10px;border-radius:7px;font-size:12px;font-weight:600;}
+  .topbar-logout:hover{background:rgba(255,255,255,0.08);color:#fff;}
+  @media (max-width:560px){ .topbar-logout span{display:none;} .topbar-logout{padding:7px;} .top-right .user-name-txt{display:none;} }
   .content{padding:24px 28px 60px;max-width:1180px;margin:0 auto;width:100%;padding-bottom:max(40px, env(safe-area-inset-bottom));}
   @media (max-width:640px){ .content{padding:14px 12px 90px;} .top-title{font-size:13px;} }
 
@@ -164,6 +169,9 @@
 
   .route-box{background:var(--asfalto);border-radius:12px;padding:8px;position:relative;}
   .route-svg{width:100%;height:auto;display:block;border-radius:8px;}
+  .route-map-wrap{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--borda);}
+  .route-map-wrap .leaflet-container{width:100%;background:#eef1f3;font-family:'Inter',sans-serif;}
+  .route-map-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(34,38,43,0.82);color:#cfd4da;font-size:13px;z-index:500;}
 
   .flexwrap{display:flex;flex-wrap:wrap;gap:10px;}
 
@@ -332,6 +340,53 @@ function RouteSVG({pontos, height=210}){
           <animate attributeName="r" values="7;10;7" dur="1.6s" repeatCount="indefinite"/>
         </circle>
       </svg>
+    </div>
+  );
+}
+
+/* ---------- mapa de rota (mapa real, ruas de verdade, via OpenStreetMap/Leaflet) ---------- */
+function RouteMap({pontos, height=210}){
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  const polylineRef = useRef(null);
+  const startRef = useRef(null);
+  const endRef = useRef(null);
+
+  useEffect(()=>{
+    if(!containerRef.current || mapRef.current) return;
+    const map = L.map(containerRef.current, {attributionControl:true, zoomControl:true});
+    map.setView([-20.3297, -40.2925], 12); // ponto neutro; ajusta assim que houver pontos reais
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; colaboradores do OpenStreetMap'
+    }).addTo(map);
+    mapRef.current = map;
+    return () => { map.remove(); mapRef.current = null; };
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !pontos || pontos.length === 0) return;
+    const latlngs = pontos.map(p => [p.lat, p.lng]);
+
+    if (polylineRef.current) polylineRef.current.setLatLngs(latlngs);
+    else polylineRef.current = L.polyline(latlngs, { color: '#2f6690', weight: 5, opacity: 0.85 }).addTo(map);
+
+    const start = latlngs[0], end = latlngs[latlngs.length - 1];
+    if (startRef.current) startRef.current.setLatLng(start);
+    else startRef.current = L.circleMarker(start, { radius: 7, color: '#fff', weight: 2, fillColor: '#3c8f5c', fillOpacity: 1 }).addTo(map);
+
+    if (endRef.current) endRef.current.setLatLng(end);
+    else endRef.current = L.circleMarker(end, { radius: 8, color: '#22262b', weight: 2, fillColor: '#f2b705', fillOpacity: 1 }).addTo(map);
+
+    if (latlngs.length === 1) map.setView(start, 16);
+    else map.fitBounds(polylineRef.current.getBounds(), { padding: [26, 26] });
+  }, [pontos]);
+
+  return (
+    <div className="route-map-wrap">
+      <div ref={containerRef} style={{ height }}></div>
+      {(!pontos || pontos.length === 0) && <div className="route-map-empty">Aguardando sinal de GPS…</div>}
     </div>
   );
 }
@@ -548,7 +603,6 @@ function App(){
             <div className="t">{user.tipo==="motorista"?"Motorista":"Administrador"}</div>
           </div>
         </div>
-        <button className="logout-btn" onClick={sair}><IconLogout size={15}/><span>Trocar acesso</span></button>
         <div className="sidebar-foot">Conectado à planilha · dados salvos no Sheets</div>
       </div>
       <div className={"sidebar-backdrop"+(mobileOpen?" show":"")} onClick={()=>setMobileOpen(false)}></div>
@@ -559,7 +613,10 @@ function App(){
             <button className="burger" onClick={()=>{ if(window.innerWidth<820){setMobileOpen(o=>!o);} else {setCollapsed(c=>!c);} }}><IconMenu/></button>
             <div className="top-title">{user.tipo==="motorista" ? "Acesso do Motorista" : "Painel Administrativo"}</div>
           </div>
-          <div className="top-right"><IconUser size={15}/> {user.nome.split(" ")[0]}</div>
+          <div className="top-right">
+            <span style={{display:'flex',alignItems:'center',gap:6}}><IconUser size={15}/> <span className="user-name-txt">{user.nome.split(" ")[0]}</span></span>
+            <button className="topbar-logout" onClick={sair} title="Trocar acesso"><IconLogout size={14}/><span>Trocar acesso</span></button>
+          </div>
         </div>
 
         <div className="content">
@@ -785,7 +842,7 @@ function ViagemAndamento({viagem, veiculos, onFinalizar}){
             {statusGps==="indisponivel" && "GPS indisponível"}
           </span>
         </div>
-        <RouteSVG pontos={pontos}/>
+        <RouteMap pontos={pontos}/>
         {statusGps==="negado" && <div className="banner-warn" style={{marginTop:12}}><IconAlert size={15}/><span>A permissão de localização foi negada. A viagem continua, mas o trajeto não será registrado — só a quilometragem informada.</span></div>}
         <div style={{marginTop:12}}>
           <button className="btn btn-ghost" onClick={checkpointManual}><IconPin size={15}/> Registrar minha localização agora</button>
@@ -1078,7 +1135,7 @@ function DetalheModal({viagem, veiculos, onClose}){
           <div className="route-box" style={{height:200,display:'flex',alignItems:'center',justifyContent:'center'}}>
             <span className="spinner"></span>
           </div>
-        ) : <RouteSVG pontos={pontos} height={240}/>}
+        ) : <RouteMap pontos={pontos} height={240}/>}
         {(viagem.fotoInicialUrl || viagem.fotoFinalUrl) && (
           <div className="grid" style={{gridTemplateColumns:'1fr 1fr',marginTop:16}}>
             <div>
