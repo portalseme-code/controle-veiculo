@@ -76,6 +76,17 @@
   .sidebar-foot{padding:12px 14px;border-top:1px solid rgba(255,255,255,0.08);font-size:11.5px;color:#8b939c;white-space:nowrap;overflow:hidden;}
   .sidebar.collapsed .sidebar-foot{display:none;}
 
+  .sidebar-backdrop{display:none;}
+  @media (max-width:820px){
+    .sidebar{position:fixed;top:0;left:0;height:100vh;z-index:45;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 0 30px rgba(0,0,0,0.35);}
+    .sidebar.mobile-open{transform:translateX(0);}
+    .sidebar.collapsed{width:236px;} /* no mobile, "collapsed" não se aplica — a gaveta é tudo ou nada */
+    .sidebar.collapsed .nav-label,.sidebar.collapsed .logo-text,.sidebar.collapsed .user-box,.sidebar.collapsed .logout-btn span{display:flex;}
+    .sidebar.collapsed .logo-text{display:block;}
+    .sidebar-backdrop{display:block;position:fixed;inset:0;background:rgba(20,22,26,0.5);z-index:44;opacity:0;pointer-events:none;transition:opacity .2s ease;}
+    .sidebar-backdrop.show{opacity:1;pointer-events:auto;}
+  }
+
   .main{flex:1;min-width:0;display:flex;flex-direction:column;}
   .topbar{height:58px;background:var(--asfalto-2);display:flex;align-items:center;justify-content:space-between;padding:0 18px;flex-shrink:0;}
   .burger{background:none;border:none;color:#cfd4da;padding:6px;border-radius:6px;display:flex;}
@@ -517,7 +528,7 @@ function App(){
 
   return (
     <div className="app">
-      <div className={"sidebar"+(collapsed?" collapsed":"")} style={mobileOpen?{position:'fixed',zIndex:40,height:'100vh'}:{}}>
+      <div className={"sidebar"+(collapsed?" collapsed":"")+(mobileOpen?" mobile-open":"")}>
         <div className="sidebar-head">
           <div className="logo-mark"><IconGauge size={19} color="#22262b"/></div>
           <div className="logo-text">RotaFrota<small>Controle de Veículos · SEME</small></div>
@@ -540,6 +551,7 @@ function App(){
         <button className="logout-btn" onClick={sair}><IconLogout size={15}/><span>Trocar acesso</span></button>
         <div className="sidebar-foot">Conectado à planilha · dados salvos no Sheets</div>
       </div>
+      <div className={"sidebar-backdrop"+(mobileOpen?" show":"")} onClick={()=>setMobileOpen(false)}></div>
 
       <div className="main">
         <div className="topbar">
