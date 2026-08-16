@@ -342,6 +342,9 @@ const haversine = (a,b) => {
 };
 const distanciaTotal = (pontos) => { let d=0; for(let i=1;i<pontos.length;i++) d+=haversine(pontos[i-1],pontos[i]); return d; };
 const kmFmt = (m) => (m/1000).toFixed(2).replace('.',',')+" km";
+// calcula km rodado evitando erros de ponto flutuante (ex: 23.4 - 22.1 = 1.2999999999999998)
+const kmDiff = (a,b) => Math.round((Number(b)-Number(a))*100)/100;
+const kmDiffStr = (a,b) => kmDiff(a,b).toLocaleString('pt-BR',{maximumFractionDigits:2});
 
 /* comprime a foto no navegador antes de enviar (reduz dados e Drive) */
 function compressImage(file, maxWidth, quality){
@@ -533,8 +536,9 @@ function NotifBanner({notif, onClose}){
 }
 
 function AccessScreen({onEnter, notificar}){
-  const [tipo,setTipo]=useState(null);
-  const [nome,setNome]=useState("");
+  const [login,setLogin]=useState("");
+  const [senha,setSenha]=useState("");
+  const [entrando,setEntrando]=useState(false);
   const [instalarDisponivel,setInstalarDisponivel]=useState(!!window.__pwaDeferredPrompt);
 
   useEffect(()=>{
@@ -555,9 +559,15 @@ function AccessScreen({onEnter, notificar}){
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone;
 
-  const confirmarMotorista=()=>{
-    if(!nome.trim()) return notificar("erro","Informe seu nome para continuar.");
-    onEnter({nome:nome.trim(), tipo:"motorista"});
+  const entrar = async (e) => {
+    e.preventDefault();
+    if(!login.trim() || !senha) return notificar("erro","Informe login e senha.");
+    setEntrando(true);
+    try{
+      const resp = await apiPost('login', {login:login.trim(), senha});
+      onEnter(resp);
+    }catch(err){ notificar("erro", err.message || "Não foi possível entrar."); }
+    setEntrando(false);
   };
 
   return (
@@ -575,29 +585,22 @@ function AccessScreen({onEnter, notificar}){
           <div className="roadline"></div>
         </div>
         <div className="login-right">
-          <h2 style={{fontSize:18,marginTop:0}}>Como você vai acessar?</h2>
-          <p style={{fontSize:12.5,color:'var(--texto-suave)',marginTop:-8,marginBottom:18}}>Escolha o tipo de acesso para continuar.</p>
+          <h2 style={{fontSize:18,marginTop:0}}>Entrar</h2>
+          <p style={{fontSize:12.5,color:'var(--texto-suave)',marginTop:-8,marginBottom:18}}>Acesse com seu login de motorista ou administrador.</p>
 
-          <div className="flexwrap" style={{marginBottom:16}}>
-            <button type="button" className={"access-card"+(tipo==="motorista"?" active":"")} onClick={()=>setTipo("motorista")}>
-              <div className="vic" style={{background:'var(--azul-estrada)'}}><IconCar size={20}/></div>
-              <div><div style={{fontWeight:700,fontSize:14}}>Motorista</div><div style={{fontSize:11.5,color:'var(--texto-suave)'}}>Registrar uma viagem</div></div>
-            </button>
-            <button type="button" className={"access-card"+(tipo==="admin"?" active":"")} onClick={()=>setTipo("admin")}>
-              <div className="vic" style={{background:'var(--linha-escura)'}}><IconGrid size={20}/></div>
-              <div><div style={{fontWeight:700,fontSize:14}}>Administrador</div><div style={{fontSize:11.5,color:'var(--texto-suave)'}}>Gerenciar a frota</div></div>
-            </button>
-          </div>
-
-          {tipo==="motorista" && (
+          <form onSubmit={entrar}>
             <div className="field">
-              <label>Seu nome</label>
-              <input type="text" value={nome} onChange={e=>setNome(e.target.value)} placeholder="Nome completo" autoFocus/>
+              <label>Login</label>
+              <input type="text" value={login} onChange={e=>setLogin(e.target.value)} placeholder="ex: joao.motorista" autoCapitalize="none" autoFocus/>
             </div>
-          )}
-
-          {tipo==="motorista" && <button className="btn btn-accent btn-block" onClick={confirmarMotorista}><IconPlay size={16}/> Continuar</button>}
-          {tipo==="admin" && <button className="btn btn-accent btn-block" onClick={()=>onEnter({nome:"Administrador", tipo:"admin"})}><IconGrid size={16}/> Entrar no painel</button>}
+            <div className="field" style={{marginBottom:0}}>
+              <label>Senha</label>
+              <input type="password" value={senha} onChange={e=>setSenha(e.target.value)} placeholder="••••••"/>
+            </div>
+            <button className="btn btn-accent btn-block" type="submit" style={{marginTop:16}} disabled={entrando}>
+              {entrando ? <span className="spinner spinner-dark"></span> : <IconUser size={16}/>} {entrando ? "Entrando…" : "Entrar"}
+            </button>
+          </form>
 
           {!isStandalone && instalarDisponivel && (
             <button type="button" className="btn btn-ghost btn-block" style={{marginTop:12}} onClick={instalarApp}><IconDownload size={15}/> Instalar app no celular</button>
@@ -619,6 +622,7 @@ function App(){
   const [page,setPage] = useState("nova-viagem");
   const [veiculos,setVeiculos] = useState([]);
   const [viagens,setViagens] = useState([]);
+  const [usuarios,setUsuarios] = useState([]);
   const [detalheViagem,setDetalheViagem] = useState(null);
   const [carregando,setCarregando] = useState(true);
   const [erroApi,setErroApi] = useState("");
@@ -635,9 +639,10 @@ function App(){
   const carregarDados = async () => {
     setCarregando(true); setErroApi("");
     try{
-      const [veic, viag] = await Promise.all([apiGet('veiculos'), apiGet('viagens')]);
+      const [veic, viag, usr] = await Promise.all([apiGet('veiculos'), apiGet('viagens'), apiGet('usuarios')]);
       setVeiculos(Array.isArray(veic)?veic:[]);
       setViagens(Array.isArray(viag)?viag:[]);
+      setUsuarios(Array.isArray(usr)?usr:[]);
     }catch(err){ setErroApi(err.message || String(err)); }
     setCarregando(false);
   };
@@ -661,12 +666,10 @@ function App(){
     setViagens(prev=>[resp, ...prev]);
   };
 
-  const finalizarViagemChamada = async (viagemId, kmFinal, fotoFinalBase64, vistoriaFinal, abastecimento) => {
+  const finalizarViagemChamada = async (viagemId, kmFinal, fotoFinalBase64, abastecimento) => {
     const resp = await apiPost('finalizarViagem', {viagemId, kmFinal:Number(kmFinal), fotoFinalBase64,
-      combustivelFinal: vistoriaFinal.combustivel, avariasFinal: vistoriaFinal.avarias, obsFinal: vistoriaFinal.obs,
       abasteceu: abastecimento.abasteceu, kmAbastecimento: abastecimento.kmAbastecimento, litrosAbastecidos: abastecimento.litrosAbastecidos});
     setViagens(prev=>prev.map(v=> v.id===viagemId ? {...v, kmFinal:Number(kmFinal), fotoFinalUrl:resp.fotoFinalUrl, fim:resp.fim, status:'concluida',
-      combustivelFinal:vistoriaFinal.combustivel, avariasFinal:(vistoriaFinal.avarias||[]).join(', '), obsFinal:vistoriaFinal.obs,
       abasteceu: abastecimento.abasteceu?'Sim':'Não', kmAbastecimento:abastecimento.kmAbastecimento, litrosAbastecidos:abastecimento.litrosAbastecidos} : v));
   };
 
@@ -679,6 +682,15 @@ function App(){
     setVeiculos(prev=>prev.filter(v=>v.id!==id));
   };
 
+  const criarUsuarioChamada = async (dados) => {
+    const resp = await apiPost('criarUsuario', dados);
+    setUsuarios(prev=>[...prev, resp]);
+  };
+  const removerUsuarioChamada = async (id) => {
+    await apiPost('removerUsuario', {id});
+    setUsuarios(prev=>prev.filter(u=>u.id!==id));
+  };
+
   const NAV_MOTORISTA = [
     {id:"nova-viagem", label:"Viagem", icon:IconPlay},
     {id:"minhas-viagens", label:"Minhas viagens", icon:IconClip},
@@ -687,6 +699,7 @@ function App(){
     {id:"painel", label:"Painel", icon:IconGrid},
     {id:"mapa-vivo", label:"Mapa ao Vivo", icon:IconPin},
     {id:"veiculos", label:"Veículos", icon:IconTruck},
+    {id:"usuarios", label:"Usuários", icon:IconUser},
     {id:"viagens", label:"Viagens", icon:IconMap},
     {id:"relatorios", label:"Relatórios", icon:IconBar},
   ];
@@ -750,6 +763,7 @@ function App(){
               {user.tipo==="admin" && page==="painel" && <PainelAdmin viagens={viagens} veiculos={veiculos}/>}
               {user.tipo==="admin" && page==="mapa-vivo" && <MapaVivo viagens={viagens} veiculos={veiculos}/>}
               {user.tipo==="admin" && page==="veiculos" && <VeiculosAdmin veiculos={veiculos} veiculoDisponivel={veiculoDisponivel} onCriar={criarVeiculoChamada} onRemover={removerVeiculoChamada} notificar={notificar}/>}
+              {user.tipo==="admin" && page==="usuarios" && <UsuariosAdmin usuarios={usuarios} onCriar={criarUsuarioChamada} onRemover={removerUsuarioChamada} notificar={notificar} usuarioAtual={user}/>}
               {user.tipo==="admin" && page==="viagens" && <ViagensAdmin viagens={viagens} veiculos={veiculos} onAbrir={setDetalheViagem}/>}
               {user.tipo==="admin" && page==="relatorios" && <RelatoriosAdmin viagens={viagens} veiculos={veiculos}/>}
             </React.Fragment>
@@ -760,42 +774,6 @@ function App(){
       {detalheViagem && <DetalheModal viagem={detalheViagem} veiculos={veiculos} onClose={()=>setDetalheViagem(null)}/>}
       </div>
     </React.Fragment>
-  );
-}
-
-/* ---------- checklist de vistoria (combustível + avarias + observações) ---------- */
-const AVARIA_OPCOES = ["Pneus","Lataria/Pintura","Para-brisa/Vidros","Bancos/Estofado","Outro"];
-const NIVEIS_COMBUSTIVEL = [{v:"Reserva",pct:10},{v:"1/4",pct:25},{v:"1/2",pct:50},{v:"3/4",pct:75},{v:"Cheio",pct:100}];
-function VistoriaChecklist({combustivel, setCombustivel, avarias, setAvarias, obs, setObs, titulo}){
-  const toggleAvaria = (op) => setAvarias(prev => prev.includes(op) ? prev.filter(a=>a!==op) : [...prev, op]);
-  const nivelAtual = NIVEIS_COMBUSTIVEL.find(n=>n.v===combustivel);
-  return (
-    <div className="section-block ok">
-      <h3><IconClip size={15}/> {titulo || "Vistoria do veículo"}</h3>
-      <div className="field">
-        <label>Nível de combustível<span style={{color:'var(--vermelho)'}}> *</span></label>
-        <div className="fuel-gauge-bar"><div className="fuel-gauge-fill" style={{width:(nivelAtual?nivelAtual.pct:0)+'%'}}></div></div>
-        <div className="fuel-gauge-ticks">
-          {NIVEIS_COMBUSTIVEL.map(n=>(
-            <button key={n.v} type="button" className={"fuel-tick"+(combustivel===n.v?" active":"")} onClick={()=>setCombustivel(n.v)}>{n.v}</button>
-          ))}
-        </div>
-      </div>
-      <div className="field">
-        <label>Avarias observadas (opcional)</label>
-        <div className="flexwrap">
-          {AVARIA_OPCOES.map(op=>(
-            <label key={op} style={{display:'flex',alignItems:'center',gap:6,fontSize:12.5,fontWeight:500,color:'var(--texto)',background:'#fff',border:'1px solid var(--borda)',borderRadius:8,padding:'7px 10px',cursor:'pointer'}}>
-              <input type="checkbox" checked={avarias.includes(op)} onChange={()=>toggleAvaria(op)} style={{width:'auto'}}/> {op}
-            </label>
-          ))}
-        </div>
-      </div>
-      <div className="field" style={{marginBottom:0}}>
-        <label>Observações (opcional)</label>
-        <textarea rows={2} placeholder="Ex: risco na porta traseira esquerda" value={obs} onChange={e=>setObs(e.target.value)}></textarea>
-      </div>
-    </div>
   );
 }
 
@@ -876,7 +854,7 @@ function NovaViagem({user, veiculos, veiculoDisponivel, onIniciar, notificar}){
           <h3><IconGauge size={15}/> Quilometragem inicial</h3>
           <div className="field" style={{marginBottom:0}}>
             <label>KM do painel ao sair</label>
-            <input type="number" inputMode="numeric" placeholder="Ex: 48210" value={kmInicial} onChange={e=>setKmInicial(e.target.value)}/>
+            <input type="number" inputMode="decimal" step="0.01" placeholder="Ex: 48210,5" value={kmInicial} onChange={e=>setKmInicial(e.target.value)}/>
           </div>
           {kmInicial!=="" && (
             <CameraCapture label="Foto do painel de KM (inicial)" value={fotoInicial} onChange={setFotoInicial} required/>
@@ -911,9 +889,6 @@ function ViagemAndamento({viagem, veiculos, onFinalizar, notificar}){
   const [online,setOnline]=useState(navigator.onLine);
   const [kmFinal,setKmFinal]=useState("");
   const [fotoFinal,setFotoFinal]=useState(null);
-  const [combustivelFinal,setCombustivelFinal]=useState("");
-  const [avariasFinal,setAvariasFinal]=useState([]);
-  const [obsFinal,setObsFinal]=useState("");
   const [abasteceu,setAbasteceu]=useState(null); // null = não respondido, true/false
   const [kmAbastecimento,setKmAbastecimento]=useState("");
   const [litrosAbastecidos,setLitrosAbastecidos]=useState("");
@@ -995,7 +970,6 @@ function ViagemAndamento({viagem, veiculos, onFinalizar, notificar}){
   const confirmarFinal = async () => {
     if(kmFinal==="" || Number(kmFinal) < Number(viagem.kmInicial)) return notificar("erro","A quilometragem final deve ser maior ou igual à inicial ("+viagem.kmInicial+").");
     if(!fotoFinal) return notificar("erro","A foto do painel de KM final é obrigatória.");
-    if(!combustivelFinal) return notificar("erro","Selecione o nível de combustível na vistoria.");
     if(abasteceu===null) return notificar("erro","Informe se foi necessário abastecer durante a viagem.");
     if(abasteceu && (kmAbastecimento==="" || litrosAbastecidos==="")) return notificar("erro","Informe o KM e a quantidade de litros do abastecimento.");
     setSalvando(true);
@@ -1003,7 +977,6 @@ function ViagemAndamento({viagem, veiculos, onFinalizar, notificar}){
       if(watchIdRef.current!==null) navigator.geolocation.clearWatch(watchIdRef.current);
       if(bufferRef.current.length){ await apiPost('adicionarPontos', {viagemId:viagem.id, pontos:bufferRef.current}); bufferRef.current=[]; try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} }
       await onFinalizar(viagem.id, kmFinal, fotoFinal,
-        {combustivel:combustivelFinal, avarias:avariasFinal, obs:obsFinal},
         {abasteceu, kmAbastecimento: abasteceu?kmAbastecimento:"", litrosAbastecidos: abasteceu?litrosAbastecidos:""});
       notificar("sucesso","Viagem finalizada com sucesso! "+(viagem.kmInicial!=null?(Number(kmFinal)-Number(viagem.kmInicial))+" km rodados.":""));
     }catch(err){ notificar("erro","Não foi possível salvar: "+(err.message||err)); }
@@ -1075,7 +1048,7 @@ function ViagemAndamento({viagem, veiculos, onFinalizar, notificar}){
           <div className="section-block accent" style={{marginBottom:12}}>
             <div className="field">
               <label>KM do painel ao chegar</label>
-              <input type="number" inputMode="numeric" placeholder={"Maior ou igual a "+viagem.kmInicial} value={kmFinal} onChange={e=>setKmFinal(e.target.value)}/>
+              <input type="number" inputMode="decimal" step="0.01" placeholder={"Maior ou igual a "+viagem.kmInicial} value={kmFinal} onChange={e=>setKmFinal(e.target.value)}/>
             </div>
             {kmFinal!=="" && <CameraCapture label="Foto do painel de KM (final)" value={fotoFinal} onChange={setFotoFinal} required/>}
           </div>
@@ -1093,7 +1066,7 @@ function ViagemAndamento({viagem, veiculos, onFinalizar, notificar}){
               <React.Fragment>
                 <div className="field">
                   <label>KM no momento do abastecimento</label>
-                  <input type="number" inputMode="numeric" placeholder="Ex: 89540" value={kmAbastecimento} onChange={e=>setKmAbastecimento(e.target.value)}/>
+                  <input type="number" inputMode="decimal" step="0.01" placeholder="Ex: 89540,5" value={kmAbastecimento} onChange={e=>setKmAbastecimento(e.target.value)}/>
                 </div>
                 <div className="field" style={{marginBottom:0}}>
                   <label>Quantidade de litros</label>
@@ -1103,7 +1076,6 @@ function ViagemAndamento({viagem, veiculos, onFinalizar, notificar}){
             )}
           </div>
 
-          <VistoriaChecklist combustivel={combustivelFinal} setCombustivel={setCombustivelFinal} avarias={avariasFinal} setAvarias={setAvariasFinal} obs={obsFinal} setObs={setObsFinal} titulo="Vistoria de chegada"/>
           <div className="sticky-actions" style={{padding:'8px 0 0'}}>
             <div className="flexwrap">
               <button className="btn btn-accent" style={{flex:1}} disabled={salvando} onClick={confirmarFinal}>
@@ -1133,7 +1105,7 @@ function MinhasViagens({viagens, veiculos, onAbrir}){
           {viagens.map(v=>{
             const veic = veiculos.find(x=>x.id===v.veiculoId);
             const cor = TIPO_COR[veic && veic.tipo] || '#2f6690';
-            const rodado = v.kmFinal ? (v.kmFinal - v.kmInicial) : null;
+            const rodado = v.kmFinal ? kmDiffStr(v.kmInicial, v.kmFinal) : null;
             return (
               <button key={v.id} className="viagem-card" onClick={()=>onAbrir(v)}>
                 <div className="vic" style={{background:cor}}><IconCar size={19}/></div>
@@ -1163,7 +1135,7 @@ function PainelAdmin({viagens, veiculos}){
   const emUso = viagens.filter(v=>v.status==="em_andamento").length;
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   const viagensHoje = viagens.filter(v=>v.inicio>=hoje.getTime()).length;
-  const kmTotal = viagens.filter(v=>v.kmFinal).reduce((s,v)=>s+(v.kmFinal-v.kmInicial),0);
+  const kmTotal = viagens.filter(v=>v.kmFinal).reduce((s,v)=>s+kmDiff(v.kmInicial,v.kmFinal),0);
   return (
     <div>
       <div className="page-head">
@@ -1174,7 +1146,7 @@ function PainelAdmin({viagens, veiculos}){
         <div className="stat" style={{'--accent':'var(--azul-estrada)'}}><div className="label">Veículos</div><div className="value">{veiculos.length}</div></div>
         <div className="stat" style={{'--accent':'var(--linha-escura)'}}><div className="label">Em uso agora</div><div className="value">{emUso}</div></div>
         <div className="stat" style={{'--accent':'var(--verde)'}}><div className="label">Viagens hoje</div><div className="value">{viagensHoje}</div></div>
-        <div className="stat" style={{'--accent':'var(--vermelho)'}}><div className="label">Km total</div><div className="value">{kmTotal}</div></div>
+        <div className="stat" style={{'--accent':'var(--vermelho)'}}><div className="label">Km total</div><div className="value">{kmTotal.toLocaleString('pt-BR',{maximumFractionDigits:2})}</div></div>
       </div>
 
       <div className="card" style={{marginTop:16}}>
@@ -1245,6 +1217,70 @@ function VeiculosAdmin({veiculos, veiculoDisponivel, onCriar, onRemover, notific
                   <td><button className="btn btn-danger" style={{padding:'6px 10px',minHeight:'auto'}} onClick={()=>remover(v.id)}><IconX size={14}/></button></td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Admin: usuários (login/senha de motoristas e administradores) ---------- */
+function UsuariosAdmin({usuarios, onCriar, onRemover, notificar, usuarioAtual}){
+  const [login,setLogin]=useState(""); const [senha,setSenha]=useState("");
+  const [nome,setNome]=useState(""); const [tipo,setTipo]=useState("motorista");
+  const [salvando,setSalvando]=useState(false);
+
+  const adicionar = async () => {
+    if(!login.trim()||!senha.trim()||!nome.trim()) return notificar("erro","Preencha login, senha e nome.");
+    if(usuarios.some(u=>u.login.toLowerCase()===login.trim().toLowerCase())) return notificar("erro","Já existe um usuário com esse login.");
+    setSalvando(true);
+    try{
+      await onCriar({login:login.trim(), senha:senha.trim(), nome:nome.trim(), tipo});
+      setLogin(""); setSenha(""); setNome("");
+      notificar("sucesso","Usuário cadastrado com sucesso!");
+    }catch(err){ notificar("erro","Não foi possível salvar: "+(err.message||err)); }
+    setSalvando(false);
+  };
+  const remover = async (u) => {
+    if(u.id===usuarioAtual.id) return notificar("erro","Você não pode remover o usuário com o qual está logado.");
+    if(!confirm("Remover o usuário "+u.nome+"?")) return;
+    try{ await onRemover(u.id); notificar("sucesso","Usuário removido."); }
+    catch(err){ notificar("erro","Não foi possível remover: "+(err.message||err)); }
+  };
+
+  return (
+    <div>
+      <div className="page-head"><div className="badge"><IconUser size={18} color="#fff"/></div><div><h1>Usuários</h1><p>Logins de motoristas e administradores</p></div></div>
+      <div className="card" style={{marginBottom:16,maxWidth:520}}>
+        <h3 style={{marginTop:0,fontSize:14}}>Novo usuário</h3>
+        <div className="field"><label>Nome completo</label><input value={nome} onChange={e=>setNome(e.target.value)} placeholder="Ex: João Carlos Silva"/></div>
+        <div className="field"><label>Login</label><input value={login} onChange={e=>setLogin(e.target.value)} placeholder="Ex: joao.silva" autoCapitalize="none"/></div>
+        <div className="field"><label>Senha</label><input type="text" value={senha} onChange={e=>setSenha(e.target.value)} placeholder="Defina uma senha"/></div>
+        <div className="field" style={{marginBottom:0}}><label>Tipo de acesso</label>
+          <select value={tipo} onChange={e=>setTipo(e.target.value)}>
+            <option value="motorista">Motorista</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+        <button className="btn btn-primary" style={{marginTop:14}} disabled={salvando} onClick={adicionar}>
+          {salvando ? <span className="spinner"></span> : null} {salvando ? "Salvando…" : "Adicionar usuário"}
+        </button>
+      </div>
+      <div className="card">
+        <div className="tablewrap">
+          <table>
+            <thead><tr><th>Nome</th><th>Login</th><th>Tipo</th><th></th></tr></thead>
+            <tbody>
+              {usuarios.map(u=>(
+                <tr key={u.id}>
+                  <td>{u.nome}{u.id===usuarioAtual.id && <span className="pill pill-disponivel" style={{marginLeft:8}}>Você</span>}</td>
+                  <td className="mono">{u.login}</td>
+                  <td>{u.tipo==="admin"?"Administrador":"Motorista"}</td>
+                  <td><button className="btn btn-danger" style={{padding:'6px 10px',minHeight:'auto'}} onClick={()=>remover(u)}><IconX size={14}/></button></td>
+                </tr>
+              ))}
+              {usuarios.length===0 && <tr><td colSpan="4" style={{color:'var(--texto-suave)',fontSize:12.5}}>Nenhum usuário cadastrado ainda.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -1524,14 +1560,6 @@ function DetalheModal({viagem, veiculos, onClose}){
               <label>Foto KM final</label>
               {viagem.fotoFinalUrl ? <a href={viagem.fotoFinalUrl} target="_blank" rel="noreferrer"><img src={viagem.fotoFinalUrl} style={{borderRadius:10,border:'1px solid var(--borda)'}}/></a> : <p style={{fontSize:12,color:'var(--texto-suave)'}}>—</p>}
             </div>
-          </div>
-        )}
-        {(viagem.combustivelFinal || viagem.avariasFinal || viagem.obsFinal) && (
-          <div className="section-block accent" style={{marginTop:16}}>
-            <h3 style={{fontSize:12.5}}>Vistoria de chegada</h3>
-            <p style={{fontSize:12.5,margin:'0 0 4px'}}><b>Combustível:</b> {viagem.combustivelFinal || "—"}</p>
-            <p style={{fontSize:12.5,margin:'0 0 4px'}}><b>Avarias:</b> {viagem.avariasFinal || "Nenhuma"}</p>
-            {viagem.obsFinal && <p style={{fontSize:12.5,margin:0}}><b>Obs.:</b> {viagem.obsFinal}</p>}
           </div>
         )}
         {viagem.abasteceu==="Sim" && (
