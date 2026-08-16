@@ -215,6 +215,17 @@
   .banner-warn{background:#fff4e0;border:1.5px solid #f0d29a;border-radius:12px;padding:13px 15px;display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:#8a5b00;}
   .banner-error{background:var(--vermelho-bg);border:1.5px solid #f0bcb6;border-radius:12px;padding:13px 15px;display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--vermelho);}
 
+  .notif-banner{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:300;display:flex;align-items:center;gap:12px;padding:15px 18px;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,0.3);max-width:92vw;width:540px;animation:notifIn .25s ease, notifPulse 1.5s ease-in-out infinite;}
+  .notif-erro{background:var(--vermelho);color:#fff;}
+  .notif-sucesso{background:var(--verde);color:#fff;}
+  .notif-icon{flex-shrink:0;width:30px;height:30px;border-radius:999px;background:rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;}
+  .notif-msg{flex:1;font-size:14px;font-weight:600;line-height:1.35;}
+  .notif-close{background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:8px;padding:6px;display:flex;flex-shrink:0;}
+  .notif-close:hover{background:rgba(255,255,255,0.34);}
+  @keyframes notifIn{from{opacity:0;transform:translate(-50%,-16px);}to{opacity:1;transform:translate(-50%,0);}}
+  @keyframes notifPulse{0%,100%{box-shadow:0 12px 40px rgba(0,0,0,0.3);}50%{box-shadow:0 14px 48px rgba(0,0,0,0.42), 0 0 0 7px rgba(255,255,255,0.10);}}
+  @media (max-width:600px){ .notif-banner{width:92vw;top:10px;padding:13px 14px;} .notif-msg{font-size:13px;} }
+
   .route-box{background:var(--asfalto);border-radius:12px;padding:8px;position:relative;}
   .route-svg{width:100%;height:auto;display:block;border-radius:8px;}
   .route-map-wrap{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--borda);}
@@ -508,10 +519,22 @@ function ErroConexao({mensagem, onTentar}){
 }
 
 /* ---------- tela de escolha de acesso (sem senha, por enquanto) ---------- */
-function AccessScreen({onEnter}){
+/* ---------- banner de notificação global (sucesso/erro), grande e pulsante no topo ---------- */
+function NotifBanner({notif, onClose}){
+  if(!notif) return null;
+  const isErro = notif.tipo === "erro";
+  return (
+    <div key={notif.key} className={"notif-banner "+(isErro?"notif-erro":"notif-sucesso")} role="alert">
+      <div className="notif-icon">{isErro ? <IconAlert size={17}/> : <IconCheck size={17}/>}</div>
+      <div className="notif-msg">{notif.msg}</div>
+      <button className="notif-close" onClick={onClose}><IconX size={15}/></button>
+    </div>
+  );
+}
+
+function AccessScreen({onEnter, notificar}){
   const [tipo,setTipo]=useState(null);
   const [nome,setNome]=useState("");
-  const [erro,setErro]=useState("");
   const [instalarDisponivel,setInstalarDisponivel]=useState(!!window.__pwaDeferredPrompt);
 
   useEffect(()=>{
@@ -533,8 +556,8 @@ function AccessScreen({onEnter}){
   const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone;
 
   const confirmarMotorista=()=>{
-    if(!nome.trim()) return setErro("Informe seu nome para continuar.");
-    setErro(""); onEnter({nome:nome.trim(), tipo:"motorista"});
+    if(!nome.trim()) return notificar("erro","Informe seu nome para continuar.");
+    onEnter({nome:nome.trim(), tipo:"motorista"});
   };
 
   return (
@@ -556,11 +579,11 @@ function AccessScreen({onEnter}){
           <p style={{fontSize:12.5,color:'var(--texto-suave)',marginTop:-8,marginBottom:18}}>Escolha o tipo de acesso para continuar.</p>
 
           <div className="flexwrap" style={{marginBottom:16}}>
-            <button type="button" className={"access-card"+(tipo==="motorista"?" active":"")} onClick={()=>{setTipo("motorista"); setErro("");}}>
+            <button type="button" className={"access-card"+(tipo==="motorista"?" active":"")} onClick={()=>setTipo("motorista")}>
               <div className="vic" style={{background:'var(--azul-estrada)'}}><IconCar size={20}/></div>
               <div><div style={{fontWeight:700,fontSize:14}}>Motorista</div><div style={{fontSize:11.5,color:'var(--texto-suave)'}}>Registrar uma viagem</div></div>
             </button>
-            <button type="button" className={"access-card"+(tipo==="admin"?" active":"")} onClick={()=>{setTipo("admin"); setErro("");}}>
+            <button type="button" className={"access-card"+(tipo==="admin"?" active":"")} onClick={()=>setTipo("admin")}>
               <div className="vic" style={{background:'var(--linha-escura)'}}><IconGrid size={20}/></div>
               <div><div style={{fontWeight:700,fontSize:14}}>Administrador</div><div style={{fontSize:11.5,color:'var(--texto-suave)'}}>Gerenciar a frota</div></div>
             </button>
@@ -572,8 +595,6 @@ function AccessScreen({onEnter}){
               <input type="text" value={nome} onChange={e=>setNome(e.target.value)} placeholder="Nome completo" autoFocus/>
             </div>
           )}
-
-          {erro && <div className="banner-error" style={{marginBottom:14}}><IconAlert size={15}/><span>{erro}</span></div>}
 
           {tipo==="motorista" && <button className="btn btn-accent btn-block" onClick={confirmarMotorista}><IconPlay size={16}/> Continuar</button>}
           {tipo==="admin" && <button className="btn btn-accent btn-block" onClick={()=>onEnter({nome:"Administrador", tipo:"admin"})}><IconGrid size={16}/> Entrar no painel</button>}
@@ -601,6 +622,15 @@ function App(){
   const [detalheViagem,setDetalheViagem] = useState(null);
   const [carregando,setCarregando] = useState(true);
   const [erroApi,setErroApi] = useState("");
+  const [notif,setNotif] = useState(null);
+
+  const notificar = (tipo, msg) => setNotif({tipo, msg, key: Date.now()});
+  useEffect(()=>{
+    if(!notif) return;
+    const t = setTimeout(()=>setNotif(null), 5000);
+    return ()=>clearTimeout(t);
+  }, [notif]);
+  const notifEl = <NotifBanner notif={notif} onClose={()=>setNotif(null)}/>;
 
   const carregarDados = async () => {
     setCarregando(true); setErroApi("");
@@ -615,8 +645,8 @@ function App(){
   useEffect(()=>{ carregarDados(); },[]);
   useEffect(()=>{ if(user) setPage(user.tipo==="motorista" ? "nova-viagem" : "painel"); }, [user && user.id, user && user.nome]);
 
-  if(erroApi) return <ErroConexao mensagem={erroApi} onTentar={carregarDados}/>;
-  if(!user) return <AccessScreen onEnter={setUser}/>;
+  if(erroApi) return <React.Fragment>{notifEl}<ErroConexao mensagem={erroApi} onTentar={carregarDados}/></React.Fragment>;
+  if(!user) return <React.Fragment>{notifEl}<AccessScreen onEnter={setUser} notificar={notificar}/></React.Fragment>;
 
   const sair = () => { setUser(null); setMobileOpen(false); };
   const veiculoDisponivel = (v) => !viagens.some(vg=>vg.veiculoId===v.id && vg.status==="em_andamento");
@@ -626,17 +656,18 @@ function App(){
   const iniciarViagem = async (dados) => {
     const resp = await apiPost('iniciarViagem', {
       motorista:user.nome, veiculoId:dados.veiculoId, finalidade:dados.finalidade,
-      kmInicial:Number(dados.kmInicial), fotoInicialBase64:dados.fotoInicial,
-      combustivelInicial:dados.combustivel, avariasInicial:dados.avarias, obsInicial:dados.obs
+      kmInicial:Number(dados.kmInicial), fotoInicialBase64:dados.fotoInicial
     });
     setViagens(prev=>[resp, ...prev]);
   };
 
-  const finalizarViagemChamada = async (viagemId, kmFinal, fotoFinalBase64, vistoriaFinal) => {
+  const finalizarViagemChamada = async (viagemId, kmFinal, fotoFinalBase64, vistoriaFinal, abastecimento) => {
     const resp = await apiPost('finalizarViagem', {viagemId, kmFinal:Number(kmFinal), fotoFinalBase64,
-      combustivelFinal: vistoriaFinal.combustivel, avariasFinal: vistoriaFinal.avarias, obsFinal: vistoriaFinal.obs});
+      combustivelFinal: vistoriaFinal.combustivel, avariasFinal: vistoriaFinal.avarias, obsFinal: vistoriaFinal.obs,
+      abasteceu: abastecimento.abasteceu, kmAbastecimento: abastecimento.kmAbastecimento, litrosAbastecidos: abastecimento.litrosAbastecidos});
     setViagens(prev=>prev.map(v=> v.id===viagemId ? {...v, kmFinal:Number(kmFinal), fotoFinalUrl:resp.fotoFinalUrl, fim:resp.fim, status:'concluida',
-      combustivelFinal:vistoriaFinal.combustivel, avariasFinal:(vistoriaFinal.avarias||[]).join(', '), obsFinal:vistoriaFinal.obs} : v));
+      combustivelFinal:vistoriaFinal.combustivel, avariasFinal:(vistoriaFinal.avarias||[]).join(', '), obsFinal:vistoriaFinal.obs,
+      abasteceu: abastecimento.abasteceu?'Sim':'Não', kmAbastecimento:abastecimento.kmAbastecimento, litrosAbastecidos:abastecimento.litrosAbastecidos} : v));
   };
 
   const criarVeiculoChamada = async (dados) => {
@@ -662,7 +693,9 @@ function App(){
   const nav = user.tipo==="motorista" ? NAV_MOTORISTA : NAV_ADMIN;
 
   return (
-    <div className="app">
+    <React.Fragment>
+      {notifEl}
+      <div className="app">
       <div className={"sidebar"+(collapsed?" collapsed":"")+(mobileOpen?" mobile-open":"")}>
         <div className="sidebar-head">
           <div className="logo-mark"><IconGauge size={19} color="#22262b"/></div>
@@ -708,15 +741,15 @@ function App(){
             <React.Fragment>
               {user.tipo==="motorista" && page==="nova-viagem" && (
                 viagemAtiva
-                  ? <ViagemAndamento viagem={viagemAtiva} veiculos={veiculos} onFinalizar={finalizarViagemChamada}/>
-                  : <NovaViagem user={user} veiculos={veiculos} veiculoDisponivel={veiculoDisponivel} onIniciar={iniciarViagem}/>
+                  ? <ViagemAndamento viagem={viagemAtiva} veiculos={veiculos} onFinalizar={finalizarViagemChamada} notificar={notificar}/>
+                  : <NovaViagem user={user} veiculos={veiculos} veiculoDisponivel={veiculoDisponivel} onIniciar={iniciarViagem} notificar={notificar}/>
               )}
               {user.tipo==="motorista" && page==="minhas-viagens" && (
                 <MinhasViagens viagens={minhasViagens} veiculos={veiculos} onAbrir={setDetalheViagem}/>
               )}
               {user.tipo==="admin" && page==="painel" && <PainelAdmin viagens={viagens} veiculos={veiculos}/>}
               {user.tipo==="admin" && page==="mapa-vivo" && <MapaVivo viagens={viagens} veiculos={veiculos}/>}
-              {user.tipo==="admin" && page==="veiculos" && <VeiculosAdmin veiculos={veiculos} veiculoDisponivel={veiculoDisponivel} onCriar={criarVeiculoChamada} onRemover={removerVeiculoChamada}/>}
+              {user.tipo==="admin" && page==="veiculos" && <VeiculosAdmin veiculos={veiculos} veiculoDisponivel={veiculoDisponivel} onCriar={criarVeiculoChamada} onRemover={removerVeiculoChamada} notificar={notificar}/>}
               {user.tipo==="admin" && page==="viagens" && <ViagensAdmin viagens={viagens} veiculos={veiculos} onAbrir={setDetalheViagem}/>}
               {user.tipo==="admin" && page==="relatorios" && <RelatoriosAdmin viagens={viagens} veiculos={veiculos}/>}
             </React.Fragment>
@@ -725,7 +758,8 @@ function App(){
       </div>
 
       {detalheViagem && <DetalheModal viagem={detalheViagem} veiculos={veiculos} onClose={()=>setDetalheViagem(null)}/>}
-    </div>
+      </div>
+    </React.Fragment>
   );
 }
 
@@ -766,28 +800,23 @@ function VistoriaChecklist({combustivel, setCombustivel, avarias, setAvarias, ob
 }
 
 /* ---------- Motorista: nova viagem ---------- */
-function NovaViagem({user, veiculos, veiculoDisponivel, onIniciar}){
+function NovaViagem({user, veiculos, veiculoDisponivel, onIniciar, notificar}){
   const [veiculoId,setVeiculoId]=useState("");
   const [finalidade,setFinalidade]=useState("");
   const [kmInicial,setKmInicial]=useState("");
   const [fotoInicial,setFotoInicial]=useState(null);
-  const [combustivel,setCombustivel]=useState("");
-  const [avarias,setAvarias]=useState([]);
-  const [obs,setObs]=useState("");
-  const [erro,setErro]=useState("");
   const [salvando,setSalvando]=useState(false);
 
   const passo1ok = !!veiculoId;
   const passo2ok = kmInicial!=="" && Number(kmInicial)>=0 && !!fotoInicial;
 
   const submeter=async ()=>{
-    if(!veiculoId) return setErro("Selecione o veículo.");
-    if(kmInicial==="" || Number(kmInicial)<0) return setErro("Informe a quilometragem inicial.");
-    if(!fotoInicial) return setErro("A foto do painel de KM é obrigatória.");
-    if(!combustivel) return setErro("Selecione o nível de combustível na vistoria.");
-    setErro(""); setSalvando(true);
-    try{ await onIniciar({veiculoId, kmInicial, finalidade, fotoInicial, combustivel, avarias, obs}); }
-    catch(err){ setErro("Não foi possível iniciar a viagem: "+(err.message||err)); }
+    if(!veiculoId) return notificar("erro","Selecione o veículo.");
+    if(kmInicial==="" || Number(kmInicial)<0) return notificar("erro","Informe a quilometragem inicial.");
+    if(!fotoInicial) return notificar("erro","A foto do painel de KM é obrigatória.");
+    setSalvando(true);
+    try{ await onIniciar({veiculoId, kmInicial, finalidade, fotoInicial}); notificar("sucesso","Viagem iniciada! Bom trajeto."); }
+    catch(err){ notificar("erro","Não foi possível iniciar a viagem: "+(err.message||err)); }
     setSalvando(false);
   };
 
@@ -845,7 +874,7 @@ function NovaViagem({user, veiculos, veiculoDisponivel, onIniciar}){
 
         <div className="section-block accent">
           <h3><IconGauge size={15}/> Quilometragem inicial</h3>
-          <div className="field">
+          <div className="field" style={{marginBottom:0}}>
             <label>KM do painel ao sair</label>
             <input type="number" inputMode="numeric" placeholder="Ex: 48210" value={kmInicial} onChange={e=>setKmInicial(e.target.value)}/>
           </div>
@@ -853,10 +882,6 @@ function NovaViagem({user, veiculos, veiculoDisponivel, onIniciar}){
             <CameraCapture label="Foto do painel de KM (inicial)" value={fotoInicial} onChange={setFotoInicial} required/>
           )}
         </div>
-
-        <VistoriaChecklist combustivel={combustivel} setCombustivel={setCombustivel} avarias={avarias} setAvarias={setAvarias} obs={obs} setObs={setObs} titulo="Vistoria de saída"/>
-
-        {erro && <div className="banner-error" style={{marginBottom:14}}><IconAlert size={15}/><span>{erro}</span></div>}
 
         <div className="banner-warn" style={{marginBottom:16}}>
           <IconPin size={15}/>
@@ -874,7 +899,7 @@ function NovaViagem({user, veiculos, veiculoDisponivel, onIniciar}){
 }
 
 /* ---------- Motorista: viagem em andamento ---------- */
-function ViagemAndamento({viagem, veiculos, onFinalizar}){
+function ViagemAndamento({viagem, veiculos, onFinalizar, notificar}){
   const veiculo = veiculos.find(v=>v.id===viagem.veiculoId);
   const STORAGE_KEY = 'rotafrota_pendentes_' + viagem.id;
   const ACCURACY_LIMIT_M = 60; // leituras com precisão pior que isso (em metros) são descartadas
@@ -889,8 +914,10 @@ function ViagemAndamento({viagem, veiculos, onFinalizar}){
   const [combustivelFinal,setCombustivelFinal]=useState("");
   const [avariasFinal,setAvariasFinal]=useState([]);
   const [obsFinal,setObsFinal]=useState("");
+  const [abasteceu,setAbasteceu]=useState(null); // null = não respondido, true/false
+  const [kmAbastecimento,setKmAbastecimento]=useState("");
+  const [litrosAbastecidos,setLitrosAbastecidos]=useState("");
   const [mostrarFinalizar,setMostrarFinalizar]=useState(false);
-  const [erro,setErro]=useState("");
   const [salvando,setSalvando]=useState(false);
   const watchIdRef = useRef(null);
   const bufferRef = useRef([]);
@@ -959,22 +986,27 @@ function ViagemAndamento({viagem, veiculos, onFinalizar}){
 
   const checkpointManual = () => {
     if(!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos)=>registrarPonto(pos,"manual"), ()=>setErro("Não foi possível obter sua localização agora."), {enableHighAccuracy:true});
+    navigator.geolocation.getCurrentPosition((pos)=>registrarPonto(pos,"manual"), ()=>notificar("erro","Não foi possível obter sua localização agora."), {enableHighAccuracy:true});
   };
 
   const distancia = distanciaTotal(pontos);
   const duracao = agora - viagem.inicio;
 
   const confirmarFinal = async () => {
-    if(kmFinal==="" || Number(kmFinal) < Number(viagem.kmInicial)) return setErro("A quilometragem final deve ser maior ou igual à inicial ("+viagem.kmInicial+").");
-    if(!fotoFinal) return setErro("A foto do painel de KM final é obrigatória.");
-    if(!combustivelFinal) return setErro("Selecione o nível de combustível na vistoria.");
-    setErro(""); setSalvando(true);
+    if(kmFinal==="" || Number(kmFinal) < Number(viagem.kmInicial)) return notificar("erro","A quilometragem final deve ser maior ou igual à inicial ("+viagem.kmInicial+").");
+    if(!fotoFinal) return notificar("erro","A foto do painel de KM final é obrigatória.");
+    if(!combustivelFinal) return notificar("erro","Selecione o nível de combustível na vistoria.");
+    if(abasteceu===null) return notificar("erro","Informe se foi necessário abastecer durante a viagem.");
+    if(abasteceu && (kmAbastecimento==="" || litrosAbastecidos==="")) return notificar("erro","Informe o KM e a quantidade de litros do abastecimento.");
+    setSalvando(true);
     try{
       if(watchIdRef.current!==null) navigator.geolocation.clearWatch(watchIdRef.current);
       if(bufferRef.current.length){ await apiPost('adicionarPontos', {viagemId:viagem.id, pontos:bufferRef.current}); bufferRef.current=[]; try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} }
-      await onFinalizar(viagem.id, kmFinal, fotoFinal, {combustivel:combustivelFinal, avarias:avariasFinal, obs:obsFinal});
-    }catch(err){ setErro("Não foi possível salvar: "+(err.message||err)); }
+      await onFinalizar(viagem.id, kmFinal, fotoFinal,
+        {combustivel:combustivelFinal, avarias:avariasFinal, obs:obsFinal},
+        {abasteceu, kmAbastecimento: abasteceu?kmAbastecimento:"", litrosAbastecidos: abasteceu?litrosAbastecidos:""});
+      notificar("sucesso","Viagem finalizada com sucesso! "+(viagem.kmInicial!=null?(Number(kmFinal)-Number(viagem.kmInicial))+" km rodados.":""));
+    }catch(err){ notificar("erro","Não foi possível salvar: "+(err.message||err)); }
     setSalvando(false);
   };
 
@@ -1033,8 +1065,6 @@ function ViagemAndamento({viagem, veiculos, onFinalizar}){
         <p style={{fontSize:11.5,color:'var(--texto-suave)',marginTop:10,marginBottom:0}}>O rastreamento roda enquanto este app estiver na tela, e os pontos são enviados à planilha a cada 15 segundos. Se a tela travar, trocar de app ou faltar internet, o registro continua salvo neste celular e é enviado assim que possível.{descartados>0 ? " "+descartados+" leitura(s) imprecisa(s) foram descartadas automaticamente." : ""}</p>
       </div>
 
-      {erro && <div className="banner-error" style={{marginBottom:14}}><IconAlert size={15}/><span>{erro}</span></div>}
-
       {!mostrarFinalizar ? (
         <div className="sticky-actions">
           <button className="btn btn-primary btn-block" onClick={()=>setMostrarFinalizar(true)}><IconFlag size={16}/> Finalizar viagem</button>
@@ -1049,6 +1079,30 @@ function ViagemAndamento({viagem, veiculos, onFinalizar}){
             </div>
             {kmFinal!=="" && <CameraCapture label="Foto do painel de KM (final)" value={fotoFinal} onChange={setFotoFinal} required/>}
           </div>
+
+          <div className="section-block">
+            <h3><IconGauge size={15}/> Abastecimento</h3>
+            <div className="field">
+              <label>Foi necessário abastecer durante a viagem?</label>
+              <div className="flexwrap">
+                <button type="button" className={"fuel-tick"+(abasteceu===true?" active":"")} style={{flex:1}} onClick={()=>setAbasteceu(true)}>Sim</button>
+                <button type="button" className={"fuel-tick"+(abasteceu===false?" active":"")} style={{flex:1}} onClick={()=>{setAbasteceu(false); setKmAbastecimento(""); setLitrosAbastecidos("");}}>Não</button>
+              </div>
+            </div>
+            {abasteceu===true && (
+              <React.Fragment>
+                <div className="field">
+                  <label>KM no momento do abastecimento</label>
+                  <input type="number" inputMode="numeric" placeholder="Ex: 89540" value={kmAbastecimento} onChange={e=>setKmAbastecimento(e.target.value)}/>
+                </div>
+                <div className="field" style={{marginBottom:0}}>
+                  <label>Quantidade de litros</label>
+                  <input type="number" inputMode="decimal" step="0.01" placeholder="Ex: 35" value={litrosAbastecidos} onChange={e=>setLitrosAbastecidos(e.target.value)}/>
+                </div>
+              </React.Fragment>
+            )}
+          </div>
+
           <VistoriaChecklist combustivel={combustivelFinal} setCombustivel={setCombustivelFinal} avarias={avariasFinal} setAvarias={setAvariasFinal} obs={obsFinal} setObs={setObsFinal} titulo="Vistoria de chegada"/>
           <div className="sticky-actions" style={{padding:'8px 0 0'}}>
             <div className="flexwrap">
@@ -1145,21 +1199,21 @@ function PainelAdmin({viagens, veiculos}){
 }
 
 /* ---------- Admin: veículos ---------- */
-function VeiculosAdmin({veiculos, veiculoDisponivel, onCriar, onRemover}){
+function VeiculosAdmin({veiculos, veiculoDisponivel, onCriar, onRemover, notificar}){
   const [placa,setPlaca]=useState(""); const [modelo,setModelo]=useState(""); const [tipo,setTipo]=useState("Passeio");
   const [salvando,setSalvando]=useState(false);
-  const [erro,setErro]=useState("");
 
   const adicionar=async ()=>{
-    if(!placa.trim()||!modelo.trim()) return setErro("Preencha placa e modelo.");
-    setErro(""); setSalvando(true);
-    try{ await onCriar({placa:placa.toUpperCase(), modelo, tipo}); setPlaca(""); setModelo(""); }
-    catch(err){ setErro("Não foi possível salvar: "+(err.message||err)); }
+    if(!placa.trim()||!modelo.trim()) return notificar("erro","Preencha placa e modelo.");
+    setSalvando(true);
+    try{ await onCriar({placa:placa.toUpperCase(), modelo, tipo}); setPlaca(""); setModelo(""); notificar("sucesso","Veículo adicionado com sucesso!"); }
+    catch(err){ notificar("erro","Não foi possível salvar: "+(err.message||err)); }
     setSalvando(false);
   };
   const remover=async (id)=>{
     if(!confirm("Remover este veículo?")) return;
-    try{ await onRemover(id); } catch(err){ alert("Não foi possível remover: "+(err.message||err)); }
+    try{ await onRemover(id); notificar("sucesso","Veículo removido."); }
+    catch(err){ notificar("erro","Não foi possível remover: "+(err.message||err)); }
   };
 
   return (
@@ -1174,7 +1228,6 @@ function VeiculosAdmin({veiculos, veiculoDisponivel, onCriar, onRemover}){
             <option>Passeio</option><option>Utilitário</option><option>Van</option><option>Ônibus</option><option>Caminhão</option>
           </select>
         </div>
-        {erro && <div className="banner-error" style={{marginTop:12}}><IconAlert size={15}/><span>{erro}</span></div>}
         <button className="btn btn-primary" style={{marginTop:14}} disabled={salvando} onClick={adicionar}>
           {salvando ? <span className="spinner"></span> : null} {salvando ? "Salvando…" : "Adicionar veículo"}
         </button>
@@ -1473,20 +1526,19 @@ function DetalheModal({viagem, veiculos, onClose}){
             </div>
           </div>
         )}
-        {(viagem.combustivelInicial || viagem.combustivelFinal || viagem.avariasInicial || viagem.avariasFinal) && (
-          <div className="grid" style={{gridTemplateColumns:'1fr 1fr',marginTop:16}}>
-            <div className="section-block" style={{marginBottom:0}}>
-              <h3 style={{fontSize:12.5}}>Vistoria de saída</h3>
-              <p style={{fontSize:12.5,margin:'0 0 4px'}}><b>Combustível:</b> {viagem.combustivelInicial || "—"}</p>
-              <p style={{fontSize:12.5,margin:'0 0 4px'}}><b>Avarias:</b> {viagem.avariasInicial || "Nenhuma"}</p>
-              {viagem.obsInicial && <p style={{fontSize:12.5,margin:0}}><b>Obs.:</b> {viagem.obsInicial}</p>}
-            </div>
-            <div className="section-block accent" style={{marginBottom:0}}>
-              <h3 style={{fontSize:12.5}}>Vistoria de chegada</h3>
-              <p style={{fontSize:12.5,margin:'0 0 4px'}}><b>Combustível:</b> {viagem.combustivelFinal || "—"}</p>
-              <p style={{fontSize:12.5,margin:'0 0 4px'}}><b>Avarias:</b> {viagem.avariasFinal || "Nenhuma"}</p>
-              {viagem.obsFinal && <p style={{fontSize:12.5,margin:0}}><b>Obs.:</b> {viagem.obsFinal}</p>}
-            </div>
+        {(viagem.combustivelFinal || viagem.avariasFinal || viagem.obsFinal) && (
+          <div className="section-block accent" style={{marginTop:16}}>
+            <h3 style={{fontSize:12.5}}>Vistoria de chegada</h3>
+            <p style={{fontSize:12.5,margin:'0 0 4px'}}><b>Combustível:</b> {viagem.combustivelFinal || "—"}</p>
+            <p style={{fontSize:12.5,margin:'0 0 4px'}}><b>Avarias:</b> {viagem.avariasFinal || "Nenhuma"}</p>
+            {viagem.obsFinal && <p style={{fontSize:12.5,margin:0}}><b>Obs.:</b> {viagem.obsFinal}</p>}
+          </div>
+        )}
+        {viagem.abasteceu==="Sim" && (
+          <div className="section-block" style={{marginTop:16}}>
+            <h3 style={{fontSize:12.5}}>Abastecimento</h3>
+            <p style={{fontSize:12.5,margin:'0 0 4px'}}><b>KM no abastecimento:</b> {viagem.kmAbastecimento || "—"}</p>
+            <p style={{fontSize:12.5,margin:0}}><b>Litros:</b> {viagem.litrosAbastecidos || "—"}</p>
           </div>
         )}
       </div>
